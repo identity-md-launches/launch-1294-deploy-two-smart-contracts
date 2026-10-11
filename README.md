@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| **Status** | Live on Sepolia (launch #1129). First integration, PLEA, live there too. Mainnet Stacker written and tested here; launch ready. |
+| **Status** | Live on Sepolia (launch #1129). First integration, PLEA, live there too. Next: Sepolia test run 2 with the new Stacker and the on-chain ProjectRegistry, then mainnet. |
 | **Test page** | https://imd-acc-sepolia-test-run.site.identitymd.eth.limo |
-| **Contract code** | [`src/Stacker.sol`](src/Stacker.sol) in this repository (the mainnet version). The Sepolia launch's code, built and deployed by the [IMD swarm](https://imd.fun), is in the [launch-1129 repository](https://github.com/identity-md-launches/launch-1129-build-imd-acc-sepolia-test). |
+| **Contract code** | [`src/Stacker.sol`](src/Stacker.sol) (the cashback funnel) and [`src/ProjectRegistry.sol`](src/ProjectRegistry.sol) (the oracle-decided project list) in this repository. The first Sepolia launch's code, built and deployed by the [IMD swarm](https://imd.fun), is in the [launch-1129 repository](https://github.com/identity-md-launches/launch-1129-build-imd-acc-sepolia-test). |
 
 ## Contents
 
@@ -99,7 +99,7 @@ Every `Stacked` event is kept as a record. Points are the basis for the leaderbo
 - **Project points:** the IMD its traders stacked.
 - **Rate and guard:** each listing states the project's rate (0.25%–1%). To list, the part of the project's fee that really leaves it (to liquidity providers, burns, prizes) must be at least as large as its cashback, so trading with yourself to farm points always costs more than it brings back. Credits that don't match the stated rate earn no points.
 - **Listed projects only.** Anyone can call `credit` with their own IMD; that's just staking for someone, so it earns no points. Only credits from a listed project count, from the block it was listed (`fromBlock`), never before.
-- **The list today** is a file per chain in this repository, [`listings/sepolia.json`](listings/sepolia.json) first, so listing a project is a commit, not a paid job. Projects apply with a [GitHub issue](https://github.com/khaed1/imd-acc/issues/new?template=listing-application.yml); the steps, checklist, fee guard and delisting are in [docs/listing.md](docs/listing.md). (The first test page shipped its own `projects.json`.) Later, an ownerless `ProjectRegistry` decided by an IMD oracle panel replaces it, with no Stacker redeploy ([design](docs/design.md#the-projectregistry)).
+- **Who is listed:** from Sepolia test run 2, an on-chain **ProjectRegistry** decides, with no owner: anyone applies with `applyListing`, an IdentityMD oracle panel answers yes or no against the rules, and anyone can challenge a listed project with a bond. Where no registry runs yet, a list file per chain in this repository is used instead. Steps, checklist, fee guard and delisting: [docs/listing.md](docs/listing.md).
 - **How they're counted:** by adding up the `Stacked` events, which can't be changed or deleted. An indexer keeps the totals ready for the site; project totals are also on chain.
 
 **What a trader sees on the dashboard**, with no visit to the vault's site:
@@ -116,7 +116,7 @@ The all-traders dashboard and leaderboards (top traders, top projects, 7-day and
 | Project | Status |
 |---|---|
 | PLEA v10 (hook `0x3d4C…68Cc`, first Stacker) | Not listed. Its listing job for the first test page ([`jobs/3-list-plea.md`](jobs/3-list-plea.md)) is no longer needed, since test run 2 replaces that page. |
-| PLEA, next version (Stacker of test run 2) | To be listed in `listings/sepolia.json` at 50 bps once deployed; then the first applicant in the Sepolia ProjectRegistry trial. |
+| PLEA, next version (Stacker of test run 2) | First applicant to the Sepolia ProjectRegistry, at 50 bps with its beneficiary. |
 
 ## Integrating a project
 
@@ -158,12 +158,12 @@ Rules:
 
 ## Roadmap
 
-1. **Sepolia test run 2:** the new Stacker on the live test pair, with a new test page, in one order. PLEA's next version then credits through it. [`jobs/5-sepolia-v2-launch.md`](jobs/5-sepolia-v2-launch.md)
+1. **Sepolia test run 2:** the new Stacker and the ProjectRegistry on the live test pair, with a new test page, in one order. PLEA's next version then credits through the Stacker and applies to the registry. [`jobs/5-sepolia-v2-launch.md`](jobs/5-sepolia-v2-launch.md)
 2. **Deploy the Stacker on Ethereum mainnet** from this repository, with a full audit by the IMD swarm. PLEA mainnet needs its address. [`jobs/4-mainnet-launch.md`](jobs/4-mainnet-launch.md)
 3. **Indexer and mainnet dashboard:** the events kept in a fast table, then the site with each trader's cashback, points and value, and the leaderboards.
 4. **Multichain:** Robinhood Chain first (PondPad), then Base and Arbitrum. Cashback waits per trader on that chain and goes to Ethereum through IMD's own LayerZero bridge, paid by a small tip ([design](docs/design.md#multichain-cashback-from-other-chains)).
 5. **v2: the ETH route** for projects whose fees are in ETH. `creditETH(trader)` records pending ETH; a public `flush()` swaps the batch to IMD through POOL4 behind a TWAP price guard, deposits it and splits the shares. Built once such a project wants in.
-6. **ProjectRegistry**: an ownerless project list decided by an IMD oracle panel through Intake v2 (whose failure callback clears an application the panel can't answer), replacing the list file. First trial on Sepolia with PLEA ([design](docs/design.md#the-projectregistry)).
+6. **ProjectRegistry on mainnet**, after the Sepolia trial: the same contract, with mainnet bond and cooldown ([design](docs/design.md#the-projectregistry)).
 
 Open questions (with recommendations) are in the [design notes](docs/design.md#open-questions): an sIMD vault on Robinhood Chain, and cashback on sells as well as buys.
 
@@ -172,8 +172,10 @@ Open questions (with recommendations) are in the [design notes](docs/design.md#o
 ```
 README.md                 this page
 src/Stacker.sol           the Stacker (mainnet version)
+src/ProjectRegistry.sol   the project list decided by an IdentityMD oracle panel (Intake v2)
+src/oracle/               the oracle attestation verifier (EIP-712), shared with PLEA
 test/                     Foundry tests: unit, edge cases, fuzz, invariants, deployment, mainnet and Sepolia forks
-  mocks/                  TestIMD and TestSIMD (a copy of StakedIMD), test doubles only
+  mocks/                  TestIMD, TestSIMD (a copy of StakedIMD), a mock Intake: test doubles only
 lib/                      forge-std, OpenZeppelin and Solady files, vendored
 launch.json               the IMD launch manifest: one Stacker, mainnet IMD and sIMD
 foundry.toml              solc 0.8.26, cancun, 10,000 optimizer runs, bytecode_hash none
@@ -202,15 +204,15 @@ With [Foundry](https://getfoundry.sh) 1.8.3, the version IMD's verifier runs:
 
 ```
 forge build
-forge test                                                        # 42 tests; the 6 fork tests skip
+forge test                                                        # 68 tests; the 7 fork tests skip
 ETH_RPC_URL=https://ethereum-rpc.publicnode.com forge test --mc MainnetFork            # live IMD and sIMD
-SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com forge test --mc SepoliaFork # live TestIMD and TestSIMD
+SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com forge test --mc SepoliaFork # live TestIMD and TestSIMD; RegistrySepoliaFork: the real Intake v2
 forge fmt --check src test
 ```
 
-The mainnet fork tests check the live vault's facts (asset, renounced owner, not paused), a credit to a new and a repeat trader, and the one-block hold followed by a redeem. The Sepolia ones check a credit, its event and totals, and that a paused vault makes `credit` revert without moving anything.
+The mainnet fork tests check the live vault's facts (asset, renounced owner, not paused), a credit to a new and a repeat trader, and the one-block hold followed by a redeem. The Sepolia ones check a credit, its event and totals, and that a paused vault makes `credit` revert without moving anything; the registry's fork test sends a real application to Intake v2 and settles it.
 
-**Branches:** `main` holds the mainnet manifest. The `sepolia` branch differs only in `launch.json`, which wires the same Stacker to the live Sepolia TestIMD and TestSIMD for test runs.
+**Branches:** `main` holds the mainnet manifest (the Stacker only). The `sepolia` branch differs only in `launch.json`: the same Stacker wired to the live Sepolia TestIMD and TestSIMD, plus the ProjectRegistry.
 
 **Working with IMD:** jobs are paid in IMD (0.5 IMD each) from the owner's wallet. Run the free `POST https://api.imd.fun/requests/check` before paying. Set hosting only with the job's `ipfs` field, never in the prompt text, or the agent tries to publish the site itself and blocks. Docs: https://imd.fun/docs.
 

@@ -3,6 +3,7 @@ Launch imd/acc on Ethereum mainnet from this repository: deploy only the Stacker
 DEPLOY (Ethereum mainnet, one contract):
 - Stacker(imd, sImd) with imd = 0xd34a99bc0f67ae1bbd63c660e6d0b0dd03e263b7 (IMD) and sImd = 0x9efa934d9fad4ae28c998a40195646b965a97247 (StakedIMD, sIMD). launch.json already lists exactly this.
 - src/Stacker.sol stays as it is: no owner, admin, fee, pause or upgrade; immutable IMD and SIMD; credit(trader, imdAmount) pulls IMD from msg.sender and calls sIMD.deposit(imdAmount, trader); per-project totals and the grand total on chain; event Stacked(project, trader, imd, shares), from which per-trader figures and points are computed. The constructor checks sIMD.asset() == IMD and approves the vault once, only where the vault has code, so the empty-chain rehearsal passes; test/Deployment.t.sol covers both cases.
+- src/ProjectRegistry.sol and src/oracle/ are in the repository but not deployed in this launch: the registry runs on Sepolia first.
 - TestIMD and TestSIMD in test/mocks are test doubles (TestSIMD is the StakedIMD source with only its name changed) and are not deployed. Keep foundry.toml as it is (solc 0.8.26, cancun, 10,000 runs, bytecode_hash none; 10,000 runs keeps the runtime free of byte patterns a linear scan reads as CALLCODE).
 
 FACTS (read on chain 2026-10-11, block 26,166,812):
@@ -10,6 +11,6 @@ FACTS (read on chain 2026-10-11, block 26,166,812):
 - sIMD: ERC-4626 over IMD, decimals 24 (offset 6), owner() = 0x0 (renounced, so nobody can pause or rescue), paused() = false, about 1.82M IMD staked. One-block hold: any positive mint stamps the receiver, who cannot withdraw or redeem in that block.
 - Mainnet fork, this exact build: deploy 446,090 gas; credit to a new trader 130,313 gas, a repeat credit 96,113 (whole transactions); the Stacker keeps 0 IMD and 0 sIMD.
 
-TESTS: forge test passes (42 tests). test/MainnetFork.t.sol runs against live IMD and sIMD when ETH_RPC_URL is set and is skipped otherwise; it checks the vault's facts, a new and a repeat credit, and the one-block hold then a redeem. Keep all of them passing.
+TESTS: forge test passes (68 tests). test/MainnetFork.t.sol runs against live IMD and sIMD when ETH_RPC_URL is set and is skipped otherwise; it checks the vault's facts, a new and a repeat credit, and the one-block hold then a redeem. Keep all of them passing.
 
 README: once live, add the Stacker's mainnet address to the Deployments table. Keep the integration rules: approve the Stacker once; compute the project's rate (0.25% to 1%) in IMD, with the part of its fee that leaves the project (liquidity, burns, prizes) at least as large as the cashback; call credit inside try/catch and pay plain IMD to the trader on failure, so a trade never reverts because of imd/acc; pass the real trader (router hookData, else sender, never tx.origin); check gasleft() before the call instead of letting a wallet's gas estimate pick a path without cashback.

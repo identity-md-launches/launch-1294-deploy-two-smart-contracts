@@ -78,3 +78,12 @@ PLEA is a sell-gated meme token on Uniswap v4 (its own repository, `khaed1/plea`
 - **Listing today:** `docs/listing.md` (steps, checklist, the fee guard with PLEA's numbers, when points start, delisting with `toBlock`, per-credit checks) and a GitHub application form. The Sepolia run 2 site brief now honours `toBlock`.
 - **ProjectRegistry:** designed in `docs/design.md` on Intake v2 (`0xa43e…de82`, code checked on Sepolia and mainnet; callback gas 1M on Sepolia, 200k on mainnet). `requestWithFailure` lets a refused or split panel clear the pending application at once; failures are unsigned, so they never list, delist or move value. No Stacker redeploy: the site and indexer read the registry instead of the file.
 - **Next:** a Sepolia trial with PLEA's next version as the first applicant, plus negative cases, a no-answer case and a challenge.
+
+## 9. ProjectRegistry built, in Sepolia test run 2 (2026-10-11)
+
+- **Decided:** start the registry now, on the Sepolia test run, with PLEA's next version as the first applicant. Anyone may apply and challenge.
+- **Built:** `src/ProjectRegistry.sol` on Intake v2 with `requestWithFailure`, reusing PLEA's attestation verifier (`src/oracle/OracleAttestation.sol`, reformatted only). Panel 15 seats, 11 agree; answers accepted only from the Intake, for its own open request, signed for this contract after the ask. A defended challenge pays the bond to the project's beneficiary; a lost one delists from that block and returns the bond; a failure or an expiry only clears the question and returns a bond.
+- **Found while building:** the oracle refuses questions filed under Sepolia's chain id ("No RPC for chain 11155111"); Sepolia questions are filed under chain 1 and name Sepolia in the text, as PLEA's gate does. The question passed IMD's free check (no blockers, judged answerable). The beneficiary is part of the rules, so nobody can apply for another team's project with their own wallet.
+- **Tests:** 23 unit and fuzz tests, an invariant suite (bonds held, records consistent, listing counts), and a Sepolia fork test against the real Intake v2: an application paid it and registered both callbacks (about 423k gas); a listing answer used 77k gas. All 68 tests pass.
+- **Launch:** the `sepolia` branch's `launch.json` now deploys the Stacker and the registry (bond 5 test IMD, cooldown 1 hour); the test page brief reads the registry and has Apply and Challenge forms.
+

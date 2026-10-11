@@ -1,8 +1,13 @@
 # Listing a project
 
-Any project can use imd/acc: its traders get real sIMD from the first credit. **Listing** decides which projects' credits also earn **points**. This page covers how listing works today, what is checked, and how it moves to an on-chain registry later.
+Any project can use imd/acc: its traders get real sIMD from the first credit. **Listing** decides which projects' credits also earn **points**. There are two ways, depending on the chain:
 
-## Today: a list file in this repository
+- **On-chain ProjectRegistry, decided by an IdentityMD oracle panel:** from Sepolia test run 2 on. Anyone applies with `applyListing`. See [below](#the-projectregistry-decided-by-an-imd-panel).
+- **A list file in this repository:** for chains without a registry yet (mainnet until the Sepolia trial is done). Described first.
+
+The checklist and the fee guard are the same either way: the file's reviewer and the oracle panel apply the same rules.
+
+## A list file in this repository
 
 One file per chain: [`listings/sepolia.json`](../listings/sepolia.json) now, `listings/mainnet.json` and others later. The test page fetches it from GitHub, so a listing takes effect when it is committed, with no paid job.
 
@@ -31,7 +36,7 @@ One file per chain: [`listings/sepolia.json`](../listings/sepolia.json) now, `li
 
 1. **Integrate.** Call `Stacker.credit` inside the project's trades, following the [integration rules](../README.md#integrating-a-project): try/catch with a plain-IMD fallback, the real trader, a gas check.
 2. **Verify** the contract source on the chain's explorer, so anyone can read it.
-3. **Apply.** Open a ["List my project" issue](https://github.com/khaed1/imd-acc/issues/new?template=listing-application.yml) with the address, rate, fee split and beneficiary.
+3. **Apply.** On a chain with a registry, call `applyListing` (or use the test page). Elsewhere, open a ["List my project" issue](https://github.com/khaed1/imd-acc/issues/new?template=listing-application.yml) with the address, rate, fee split and beneficiary.
 4. **Review** against the checklist below.
 5. **Decision** by the repository owner. If yes, the entry is committed and points start.
 
@@ -74,10 +79,18 @@ If a listed project breaks the rules (changes its rate, fails the guard, credits
 
 The indexer compares each credit with the trade in the same transaction. A credit at a rate other than `rateBps`, or with no trade on the project's pool in that transaction, earns no points.
 
-### Who decides today
+### Who decides the file
 
 The repository owner. Every change to the list is public in the git history: who was listed, when, and with which numbers.
 
-## Later: the ProjectRegistry, decided by an IMD panel
+## The ProjectRegistry, decided by an IMD panel
 
-When more than one or two projects want in, the list file is replaced by a small on-chain contract with **no owner**, so nobody decides alone. **The Stacker is never redeployed:** it doesn't know about listings, so the site and the indexer simply read the registry instead of the file. The design, with Intake v2's failure callback, is in [design.md](design.md#the-projectregistry). Its first trial runs on Sepolia, with PLEA as the first project to apply.
+A small on-chain contract with **no owner** ([`src/ProjectRegistry.sol`](../src/ProjectRegistry.sol)), first deployed in Sepolia test run 2, with PLEA as the first applicant. **The Stacker is never redeployed:** it doesn't know about listings, so the site and the indexer read the registry's events instead of a file.
+
+1. **Apply.** Anyone calls `applyListing(project, name, sourceUrl, rateBps, beneficiary)` and pays the 0.5 IMD oracle fee. The project must be a contract; the rate 25 to 100.
+2. **The panel answers** in a few minutes: true only if every rule on the checklist holds, including the fee guard and that the beneficiary belongs to the project's team. **Yes** lists the project from that block; **no** rejects it, and it can apply again.
+3. **No answer** (the panel split or the question was refused): the application is cleared and can be sent again at once. Nothing is listed.
+4. **Challenge.** Anyone can challenge a listed project, after a cooldown, by paying the oracle fee plus a bond. If the panel says it still meets the rules, it stays listed and **the bond goes to the project's beneficiary**; if not, it is delisted from that block, earlier points stay, and the challenger gets the bond back.
+5. **Points** count a project's credits inside its listing periods only.
+
+The full design, the checks every answer must pass, and the known limits are in [design.md](design.md#the-projectregistry).

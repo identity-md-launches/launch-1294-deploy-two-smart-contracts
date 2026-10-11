@@ -20,48 +20,77 @@ Anyone can call `credit` with their own IMD. That is just staking for someone, a
 
 **Points start at listing.** A listed project's credits earn points only from its `fromBlock`, never retroactively, so nobody can build fake history and then get approved. A project reviewed before or at launch gets its deploy block (PLEA's case).
 
-**Later: the IMD panel decides the list** through the ProjectRegistry, below. The Stacker never changes.
+**Next: the IMD panel decides the list** through the ProjectRegistry, below, from Sepolia test run 2 on. The Stacker never changes.
 
 ## The ProjectRegistry
 
-**Planned (2026-10-11); its first trial runs on Sepolia with PLEA.** A small contract with **no owner** replaces the list file, so nobody decides alone. **Nothing is redeployed:** the Stacker doesn't know about listings, so the site and the indexer read the registry's events instead of the file. The registry ships as its own small `evm_contracts` job.
+**Built and tested (2026-10-11); it ships in Sepolia test run 2, and PLEA's next version is the first applicant.** Code: [`src/ProjectRegistry.sol`](../src/ProjectRegistry.sol). A small contract with **no owner** decides the list through IdentityMD oracle panels, so nobody decides alone. **Nothing is redeployed:** the Stacker doesn't know about listings, so the site and the indexer read the registry's events instead of a list file.
 
-**Oracle: IMD's Intake v2**, `0xa43e6f75ee006411f79ac1c84120606c2330de82`, the same address on Ethereum, Sepolia and Robinhood Chain (code checked on Sepolia and mainnet, 2026-10-11). It keeps every v1 function and adds `requestWithFailure(action, body, callback, onFailure, asset, amount)`, which also reports when the panel gives no answer. Callback gas: 200,000 on mainnet, 1,000,000 on Sepolia (`callbackGas()`, read 2026-10-11).
+**Oracle: Intake v2**, `0xa43e6f75ee006411f79ac1c84120606c2330de82`, the same address on Ethereum, Sepolia and Robinhood Chain. The registry asks with `requestWithFailure`, so a refused question or a split panel calls it back too. Callback gas: 200,000 on mainnet, 1,000,000 on Sepolia. Checked against the live contract: the four functions the registry calls are in its code, and on a Sepolia fork the real Intake took the fee and recorded both callbacks.
 
-**Stored per project:** status (none, pending, listed, rejected, delisted), name, source URL, `rateBps`, beneficiary, `fromBlock`, `toBlock`, and the pending oracle request id.
+### How it works
 
-**1. Apply.** `apply(project, name, sourceUrl, rateBps, beneficiary)` pays the oracle fee (0.5 IMD) and sends the question with `requestWithFailure`. One pending application per project at a time. The question and its hash are computed here, not in the callback.
+| Step | Who | What happens |
+|---|---|---|
+| `applyListing(project, name, sourceUrl, rateBps, beneficiary)` | anyone | Pays the 0.5 IMD oracle fee and sends a yes-or-no question about the project. The project must be a contract, the rate 25-100 bps; name and URL are short printable ASCII (no quotes, backslashes or brackets) and go into the question as untrusted text. One open question per project at a time. |
+| Signed **yes** | oracle panel | Listed from this block (`Listed`), with the stated rate and beneficiary. No challenge for `challengeCooldown`. |
+| Signed **no** | oracle panel | `Rejected`. The project can apply again. |
+| `challenge(project, reason)` | anyone | Only for a listed project, after its cooldown. Pays the oracle fee plus `challengeBond`. The panel is asked whether the project still meets every rule. |
+| Challenge, signed **yes** (still meets the rules) | oracle panel | Stays listed (`Defended`); **the bond goes to the project's beneficiary**; a new cooldown starts. |
+| Challenge, signed **no** | oracle panel | Delisted from this block (`Delisted`); **the bond goes back to the challenger**. Points before this block stay. The project can apply again later; a new listing starts a new period. |
+| No answer (refused or split panel) | Intake, through `onOracleFailure` | The open question is cleared (`AskCleared`) and a challenger's bond goes back. Nothing is listed or delisted. |
+| `expire(project)` | anyone | Clears an open question after a day, or at once if the Intake completed it without a settled answer (for example a callback that ran out of gas). A challenger's bond goes back. |
+| `setBeneficiary(project, wallet)` | the current beneficiary | Hands a listed project's points to another wallet. |
 
-> Is `<project>` on `<chain>` a real trading project whose verified source pays imd/acc cashback through `Stacker.credit`, out of fees its traders pay, at `<rateBps>` of each trade (25 to 100), with the part of its fee that really leaves the project at least as large as the cashback? Reject wallets, contracts that credit their own IMD, and wash-trading setups.
+### What the panel is asked
 
-Evidence: the verified source URL, the address and chain, the stated rate and beneficiary. `answerType: bool`, a panel like PLEA's.
+The question names the Stacker, the project, the chain and the registry, the stated rate and beneficiary, and the applicant's name and URL as untrusted text. It asks for **true only if every rule holds**, judged from the verified source and on-chain state:
+- **trading:** a trading venue that calls `credit` only while executing a trade, for that trade's trader, with IMD from that trade's fees;
+- **rate:** the stated rate, between 25 and 100 bps, and if the rate can change, the code keeps it in that range;
+- **feeGuard:** the parts of the fee that leave for good are at least the cashback;
+- **beneficiary:** the project's owner, or a wallet its verified source or official website names as its team or treasury. This stops someone from applying for another team's project with their own wallet as beneficiary;
+- **evidence:** the verified source on the chain's explorer; unverified code means false.
 
-**2. Answer (callback, status 0).**
-- Only Intake v2 may call it, and only for the pending request id.
-- It checks the signed attestation the way PLEA's gate does: EIP-712 domain "IdentityMD Oracle" version 2 with this chain and contract, the oracle signer `0x5598aa9146215bc13eb26f2c692ad1461fd32982`, and the question hash stored at apply time.
-- **Yes:** listed, `fromBlock` = this block, event `Listed`. **No:** rejected, event `Rejected`; the project may apply again.
-- It stores the verdict and nothing more, so it fits the 200k gas mainnet gives callbacks.
+A challenge asks whether the listed project still meets all of them, with the challenger's reason as untrusted text. Panel: 15 seats, 11 must agree. IMD's free check accepted this question (no blockers, judged answerable).
 
-**3. No answer (failure callback, status 1 refused or 2 no agreement).**
-- `onFailure(requestId, status, reason, agreed, answered, signature)` from Intake v2, for our pending id only, clears the pending application, so the project can apply again at once.
-- Failures are not signed yet (IMD dev, 2026-10-11), so a failure **never** lists, delists or moves value. The oracle fee is spent either way.
-- This replaces the manual clear PLEA needed when plea #3 split the panel.
+**Filed under chain 1.** The oracle has no Sepolia RPC (its check refuses chain 11155111), so Sepolia questions are filed under chain 1, like PLEA's gate does, and the text names Sepolia. The registry's `questionChainId` is 1 on Sepolia and mainnet; it would be 4663 on Robinhood Chain.
 
-**4. Challenge.** Anyone calls `challenge(project, reason)` and pays the oracle fee. The panel answers "does this listed project still meet the rules?" **No:** delisted, `toBlock` = this block, event `Delisted`; earlier points stay. A failure only clears the pending challenge. One pending challenge per project.
+### What an answer must pass
+1. It comes from the Intake, for a request this registry made and hasn't settled.
+2. It is signed by the oracle signer `0x5598…2982` in this contract's EIP-712 domain ("IdentityMD Oracle", version 2), and is not expired.
+3. It was issued after the question was asked, so an older answer can't be reused.
+4. It is filed under `questionChainId`, from a panel of at least 15 with at least 11 agreeing, and it is a bool.
 
-**Open details:**
-- Who may apply for a project. **Recommendation:** anyone, one pending at a time; each application costs its sender 0.5 IMD, and the panel rejects wrong data.
-- An application fee on top of the oracle fee, and a challenge bond against spam.
-- One registry per chain, or one on Ethereum listing projects on every chain.
-- The oracle fee token on Sepolia: on 2026-10-09 it was the test IMD `0x44a1cd38474fb1748400e7deb5f8d786cce3f89a`, which anyone can mint. Confirm with Intake v2 before building.
+It does not pin the question's hash. Like PLEA's gate, it relies on the Intake pairing each answer with the right request, which is what IMD's docs recommend for a contract that asks on its own chain. Pinning the hash would mean rebuilding IMD's canonical JSON on chain, with a high cost if it is wrong by one byte.
 
-**Sepolia trial with PLEA:**
-1. Deploy the registry on Sepolia, wired to Intake v2.
-2. PLEA's next version, crediting through the Stacker of test run 2, applies at 50 bps with its beneficiary. Expected: yes.
-3. Negative cases: a plain wallet, and a contract that credits its own IMD. Expected: no.
+### Money it holds
+Only the bonds of open challenges, never anything else, and never an approval left to the Intake (each ask approves exactly the fee, which the Intake takes at once). A failure or an expiry returns a bond to the challenger who paid it. That is the only value an unsigned failure moves, and it gives the Intake's writer no power it doesn't already have: withholding an answer leads to the same refund through `expire`.
+
+### Settings
+
+| Setting | Sepolia test run 2 | Mainnet |
+|---|---|---|
+| Oracle fee | 0.5 test IMD (anyone can mint it) | 0.5 IMD |
+| Challenge bond | 5 test IMD | to decide |
+| Challenge cooldown | 1 hour | to decide (for example 7 days) |
+| Panel | 15 seats, 11 agree | same |
+| Open question expires | after 1 day | same |
+
+### Known limits
+- **Blocking by spam:** someone can keep a project's application slot busy by applying for it with wrong terms, one question at a time. Each try costs them 0.5 IMD and lasts until the panel answers (minutes).
+- **Fixed oracle settings:** the signer, the action id (`oracle.request@oracle-1`) and the fee are fixed in the contract. If IMD changes them, a new registry is deployed, and the site reads both, so listing history is kept.
+- **Writer trust:** the Intake's writer can withhold an answer or pair one with the wrong request. That suits a listing decision, which can wait and be challenged.
+
+### Tests
+`test/ProjectRegistry.t.sol` (23 tests) covers every path and check above, including the answers fitting mainnet's 200k callback gas. `test/ProjectRegistryInvariant.t.sol` runs random sequences and checks three things: the registry holds exactly the open bonds and no approval; every record matches its open question and listing; listings minus delistings equals the projects listed now. `test/RegistrySepoliaFork.t.sol` runs against the real Intake v2 on a Sepolia fork: an application costs about 423k gas, and a listing answer 77k.
+
+### Sepolia trial with PLEA
+1. Test run 2 deploys the Stacker and the registry.
+2. PLEA's next version credits through that Stacker and applies at 50 bps with its beneficiary. Expected: yes.
+3. Negative cases: a plain wallet (refused before asking, since it has no code), and a contract that credits its own IMD. Expected: no.
 4. A no-answer case, to see the failure callback clear the application.
-5. A challenge against PLEA. Expected: it stays listed.
-6. The test page reads the registry instead of `listings/sepolia.json`.
+5. A challenge against PLEA. Expected: it stays listed and the bond goes to its beneficiary.
+6. The test page shows the registry's state and counts points by its listing periods.
 
 ## Points now, token maybe later
 
@@ -207,13 +236,14 @@ Side benefit: POOL4 burns a cut of IMD on its trades, so every flush also burns 
 - **Cashback rate:** 0.25% to 1% of each trade, chosen by each project and funded from its existing fees (was a fixed 0.5% until 2026-10-11; see above).
 - **Mainnet Stacker (2026-10-11):** the lean version in this repository: per-project totals on chain, per-trader figures from events. The constructor checks the vault and approves it only where the vault has code, so IMD's empty-chain rehearsal passes.
 - **Dashboard (2026-10-11):** points, leaderboards and each trader's cashback, value and yield come from the events plus live vault reads, served by an indexer.
+- **ProjectRegistry (2026-10-11):** anyone may apply or challenge; one registry per chain; a defended challenge pays the bond to the project's beneficiary, a lost one returns it; no application fee beyond the oracle fee. First on Sepolia test run 2 with PLEA.
 - **Multichain (2026-10-11):** per-trader waiting balances on other chains, delivered to Ethereum through IMD's bridge, paid by a tip of up to 2% that rises over 12 hours.
 
 ## Open questions
 
 1. **Is an sIMD vault planned on Robinhood Chain?** IMD exists there (`0x5f7bb59365ce557c26dbcaa4ee9d39a4b95b7127`, the same OFT), but no vault does. **Recommendation:** ask the IMD team whether they will deploy StakedIMD there; until then PondPad pays its cashback as plain IMD. A Stacker on Robinhood Chain is a one-contract launch once a vault exists.
 2. **Should sells get cashback too, or buys only?** (PLEA pays it on every trade.) **Recommendation:** both. Every trade pays a fee, so every trade funds its 0.5%; wash trading for points still loses money, because the fees on a round trip are larger than the cashback.
-3. **An application fee for the ProjectRegistry**, on top of the 0.5 IMD oracle fee?
+3. **Mainnet registry settings:** the challenge bond and cooldown (Sepolia uses 5 test IMD and 1 hour). There is no application fee beyond the 0.5 IMD oracle fee.
 
 Known and harmless: a credit mints sIMD to the trader, and the vault's one-block hold then stops that trader from redeeming in the same block. Anyone can already do this by depositing into the vault for someone, so the Stacker adds nothing new.
 

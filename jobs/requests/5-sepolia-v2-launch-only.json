@@ -6,7 +6,7 @@
     "chainId": 11155111,
     "github": true,
     "repoUrl": "https://github.com/khaed1/imd-acc.git",
-    "baseCommit": "e3ea779eb4eaac81b54607ba12ad39e54f66a476",
+    "baseCommit": "6c0b72a1955fb66650778b5cb7da39e28ec5af90",
     "references": [
       "evm-contracts-launch",
       "defi-native",
