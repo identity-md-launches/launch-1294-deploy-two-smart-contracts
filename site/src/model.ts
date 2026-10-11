@@ -36,13 +36,31 @@ export function checkedText(
   max: number,
   label: string,
 ) {
-  if (
-    text.length < min ||
-    text.length > max ||
-    /[^\x20-\x7e]|["\\\[\]]/.test(text)
-  ) {
+  if (text.length < min)
     throw new Error(
-      `${label}: use ${min}–${max} printable ASCII characters, without double quotes, backslashes or square brackets.`,
+      `${label} is too short. Use at least ${min} character${min === 1 ? "" : "s"}.`,
+    );
+  if (text.length > max)
+    throw new Error(
+      `${label} is too long. Use at most ${max} characters (currently ${text.length}).`,
+    );
+  const invalid = [...text].find((character) =>
+    /[^\x20-\x7e]|["\\\[\]]/.test(character),
+  );
+  if (invalid) {
+    const code = `U+${invalid.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}`;
+    const name =
+      invalid === '"'
+        ? "double quote"
+        : invalid === "\\"
+          ? "backslash"
+          : invalid === "[" || invalid === "]"
+            ? `square bracket (${invalid})`
+            : invalid.codePointAt(0)! > 127
+              ? `non-ASCII character “${invalid}” (${code})`
+              : `non-printable ASCII character (${code})`;
+    throw new Error(
+      `${label} contains a ${name}. Remove it; use printable ASCII without double quotes, backslashes or square brackets.`,
     );
   }
   return text;

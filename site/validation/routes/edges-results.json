@@ -1,0 +1,349 @@
+{
+  "mode": "edges",
+  "checkedAt": "2026-10-11T13:46:47.062Z",
+  "browser": "154.0.8037.0",
+  "blocks": [],
+  "checks": [
+    "Boundary reflow at 320, 390, 859 and 860px in both themes; menu/desktop breakpoint and single-row bar passed. Rendered CSS contrast pairs all meet 4.5:1. Simulated read failure and Retry recovered live data.",
+    "No page exceptions, console errors or failed resources in the completed run."
+  ],
+  "measurements": [
+    {
+      "width": 320,
+      "theme": "light",
+      "hash": "#/apply",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 320,
+      "theme": "light",
+      "hash": "#/docs/addresses",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 320,
+      "theme": "light",
+      "hash": "#/stack",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 320,
+      "theme": "light",
+      "hash": "#/",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "hash": "#/apply",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "hash": "#/docs/addresses",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "hash": "#/stack",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "hash": "#/",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "hash": "#/apply",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "hash": "#/docs/addresses",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "hash": "#/stack",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "hash": "#/",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "hash": "#/apply",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "hash": "#/docs/addresses",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "hash": "#/stack",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "hash": "#/",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 859,
+      "theme": "light",
+      "hash": "#/apply",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 859,
+      "theme": "light",
+      "hash": "#/docs/addresses",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 859,
+      "theme": "light",
+      "hash": "#/stack",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 859,
+      "theme": "light",
+      "hash": "#/",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 859,
+      "theme": "dark",
+      "hash": "#/apply",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 859,
+      "theme": "dark",
+      "hash": "#/docs/addresses",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 859,
+      "theme": "dark",
+      "hash": "#/stack",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 859,
+      "theme": "dark",
+      "hash": "#/",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 860,
+      "theme": "light",
+      "hash": "#/apply",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 860,
+      "theme": "light",
+      "hash": "#/docs/addresses",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 860,
+      "theme": "light",
+      "hash": "#/stack",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 860,
+      "theme": "light",
+      "hash": "#/",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 860,
+      "theme": "dark",
+      "hash": "#/apply",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 860,
+      "theme": "dark",
+      "hash": "#/docs/addresses",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 860,
+      "theme": "dark",
+      "hash": "#/stack",
+      "overflow": false,
+      "oneRow": true
+    },
+    {
+      "width": 860,
+      "theme": "dark",
+      "hash": "#/",
+      "overflow": false,
+      "oneRow": true
+    }
+  ],
+  "accessibility": [],
+  "errors": [],
+  "resourceFailures": [],
+  "contrast": [
+    {
+      "theme": "light",
+      "bodyBackground": "rgb(255, 255, 255)",
+      "tokens": {
+        "paper": "#fff",
+        "ink": "#000",
+        "dim": "#555",
+        "ok": "#17804a",
+        "alarm": "#b3261e",
+        "hover": "#f4f4f4"
+      },
+      "pairs": [
+        {
+          "foreground": "ink",
+          "background": "paper",
+          "ratio": 21
+        },
+        {
+          "foreground": "dim",
+          "background": "paper",
+          "ratio": 7.46
+        },
+        {
+          "foreground": "ok",
+          "background": "paper",
+          "ratio": 4.97
+        },
+        {
+          "foreground": "alarm",
+          "background": "paper",
+          "ratio": 6.54
+        },
+        {
+          "foreground": "ink",
+          "background": "hover",
+          "ratio": 19.09
+        },
+        {
+          "foreground": "dim",
+          "background": "hover",
+          "ratio": 6.78
+        },
+        {
+          "foreground": "ok",
+          "background": "hover",
+          "ratio": 4.52
+        },
+        {
+          "foreground": "alarm",
+          "background": "hover",
+          "ratio": 5.94
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "bodyBackground": "rgb(0, 0, 0)",
+      "tokens": {
+        "paper": "#000",
+        "ink": "#fff",
+        "dim": "#9a9a9a",
+        "ok": "#3ecf7a",
+        "alarm": "#ff6b62",
+        "hover": "#141414"
+      },
+      "pairs": [
+        {
+          "foreground": "ink",
+          "background": "paper",
+          "ratio": 21
+        },
+        {
+          "foreground": "dim",
+          "background": "paper",
+          "ratio": 7.46
+        },
+        {
+          "foreground": "ok",
+          "background": "paper",
+          "ratio": 10.41
+        },
+        {
+          "foreground": "alarm",
+          "background": "paper",
+          "ratio": 7.53
+        },
+        {
+          "foreground": "ink",
+          "background": "hover",
+          "ratio": 18.42
+        },
+        {
+          "foreground": "dim",
+          "background": "hover",
+          "ratio": 6.55
+        },
+        {
+          "foreground": "ok",
+          "background": "hover",
+          "ratio": 9.13
+        },
+        {
+          "foreground": "alarm",
+          "background": "hover",
+          "ratio": 6.61
+        }
+      ]
+    }
+  ]
+}

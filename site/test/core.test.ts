@@ -223,7 +223,7 @@ test("preflight refuses EOAs, listed projects and open questions", async () => {
   await assert.rejects(checkApplication(form, client), /open question/);
   ask = 0n;
   listed = true;
-  await assert.rejects(checkApplication(form, client), /already listed/);
+  await assert.rejects(checkApplication(form, client), /[Aa]lready listed/);
 });
 test("human transaction errors explain cancellation, beneficiary race and short allowance", () => {
   assert.match(explainError({ code: 4001 }), /cancelled/);
@@ -295,4 +295,100 @@ test("expiry is strictly older than the threshold or completed in Intake", () =>
   assert.equal(canExpire(state, 86501n, 86400n, false), true);
   assert.equal(canExpire(state, 101n, 86400n, true), true);
   assert.equal(canExpire({ ...state, ask: 0n }, 86501n, 86400n, true), false);
+});
+
+test("field validation names the exact character or length failure", () => {
+  const cases: [string, RegExp][] = [
+    ['a"b', /double quote/],
+    ["a\\b", /backslash/],
+    ["[a]", /square bracket/],
+    ["café", /non-ASCII.*U\+00E9/],
+    ["a\nb", /non-printable ASCII.*U\+000A/],
+    ["", /too short/],
+    ["x".repeat(281), /too long/],
+  ];
+  for (const [value, message] of cases)
+    assert.throws(() => checkedText(value, 1, 280, "Reason"), message);
+});
+
+test("hash routes distinguish project addresses, individual docs and unknown paths", async () => {
+  const { parseRoute, currentPage } = await import("../src/routes");
+  assert.equal(parseRoute("").page, "home");
+  assert.equal(parseRoute("#/stack").page, "stack");
+  assert.equal(parseRoute("#/docs").page, "docs");
+  for (const slug of [
+    "what",
+    "how",
+    "addresses",
+    "integrate",
+    "listing",
+    "points",
+    "agents",
+  ]) {
+    const route = parseRoute(`#/docs/${slug}`);
+    assert.ok(route.page === "docs" && route.section === slug);
+    assert.ok(currentPage(route, "#/docs/what"));
+  }
+  const route = parseRoute(`#/projects/${project}`);
+  assert.equal(route.page, "project");
+  assert.ok(currentPage(route, "#/projects"));
+  for (const invalid of [
+    "#/missing",
+    "#/docs/nope",
+    "#/docs/what/more",
+    "#/projects/not-an-address",
+    `#/projects/${project}/extra`,
+  ])
+    assert.equal(parseRoute(invalid).page, "not-found");
+});
+
+test("application code and registry errors are attached to the project field", async () => {
+  const { checkApplicationProject, FormFieldError } =
+    await import("../src/chain");
+  let code = "0x",
+    ask = 0n,
+    listed = false;
+  const client = {
+    request: async () => code,
+    read: async () => ({ ask, listed }),
+  } as unknown as Rpc;
+  for (const message of [
+    /no contract code/,
+    /open question/,
+    /Already listed/,
+  ]) {
+    await assert.rejects(
+      checkApplicationProject(project, client),
+      (error: unknown) =>
+        error instanceof FormFieldError &&
+        error.field === "project" &&
+        message.test(error.message),
+    );
+    if (code === "0x") {
+      code = "0x6000";
+      ask = 1n;
+    } else {
+      ask = 0n;
+      listed = true;
+    }
+  }
+});
+
+test("listing cooldown keeps its exact opening time instead of becoming a faucet error", async () => {
+  const client = {
+    read: async (_: unknown, __: unknown, method: string) =>
+      method === "projectOf"
+        ? { listed: true, ask: 0n, challengeOpenAt: 100n, beneficiary: trader }
+        : 5n,
+    request: async () => ({ timestamp: "0x63" }),
+  } as unknown as Rpc;
+  try {
+    await checkChallenge(project, "Reason", trader, 5n, client);
+    assert.fail("must reject cooldown");
+  } catch (error) {
+    const message = explainError(error);
+    assert.match(message, /listing cooldown/);
+    assert.match(message, /Challenge opens/);
+    assert.doesNotMatch(message, /faucet/);
+  }
 });

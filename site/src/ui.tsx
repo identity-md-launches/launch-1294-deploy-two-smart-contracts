@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { EXPLORER } from "./config";
 import { short } from "./model";
+import { projectPath } from "./routes";
 import type { TxState } from "./wallet";
 
 export function Copy({
@@ -69,6 +70,24 @@ export function Address({
       </a>
       {copy && <Copy value={value} />}
     </span>
+  );
+}
+export function ProjectLink({
+  value,
+  label,
+}: {
+  value: string;
+  label?: string;
+}) {
+  return (
+    <a
+      className="project-link"
+      href={projectPath(value)}
+      title={value}
+      aria-label={`${label ?? short(value)}: open project ${value}`}
+    >
+      {label ?? short(value)}
+    </a>
   );
 }
 export function TxStatus({ state }: { state?: TxState }) {

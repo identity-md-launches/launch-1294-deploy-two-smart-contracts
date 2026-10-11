@@ -1,0 +1,203 @@
+{
+  "mode": "fixtures",
+  "checkedAt": "2026-10-11T13:54:27.008Z",
+  "browser": "154.0.8037.0",
+  "blocks": [],
+  "checks": [
+    "Synthetic registry fixtures: all 8 history event kinds and 12 dates; Challenge reason blur errors, cooldown date, open question and zero beneficiary; Apply Already listed; listed detail layout/axe at all 6 width/theme combinations.",
+    "Fixture responses are UI tests only. No signed oracle outcome or successful challenge transaction is claimed.",
+    "No page exceptions, console errors or failed resources in the completed run."
+  ],
+  "measurements": [
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 360,
+      "scroll": 360,
+      "barWidth": 360,
+      "barHeight": 54,
+      "centers": [
+        26.9921875,
+        27,
+        27
+      ],
+      "focus": "page-heading",
+      "scrollY": 0,
+      "title": "Project - imd/acc",
+      "theme": "light",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "contents": "flex",
+      "select": "flex"
+    },
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 360,
+      "scroll": 360,
+      "barWidth": 360,
+      "barHeight": 54,
+      "centers": [
+        26.9921875,
+        27,
+        27
+      ],
+      "focus": "page-heading",
+      "scrollY": 0,
+      "title": "Project - imd/acc",
+      "theme": "dark",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "contents": "flex",
+      "select": "flex"
+    },
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 768,
+      "scroll": 768,
+      "barWidth": 768,
+      "barHeight": 64,
+      "centers": [
+        32,
+        32,
+        32
+      ],
+      "focus": "page-heading",
+      "scrollY": 0,
+      "title": "Project - imd/acc",
+      "theme": "light",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "contents": "flex",
+      "select": "flex"
+    },
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 768,
+      "scroll": 768,
+      "barWidth": 768,
+      "barHeight": 64,
+      "centers": [
+        32,
+        32,
+        32
+      ],
+      "focus": "page-heading",
+      "scrollY": 0,
+      "title": "Project - imd/acc",
+      "theme": "dark",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "contents": "flex",
+      "select": "flex"
+    },
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 1280,
+      "scroll": 1280,
+      "barWidth": 1168,
+      "barHeight": 64,
+      "centers": [
+        32,
+        32,
+        32
+      ],
+      "focus": "page-heading",
+      "scrollY": 0,
+      "title": "Project - imd/acc",
+      "theme": "light",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "contents": "flex",
+      "select": "flex"
+    },
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 1280,
+      "scroll": 1280,
+      "barWidth": 1168,
+      "barHeight": 64,
+      "centers": [
+        32,
+        32,
+        32
+      ],
+      "focus": "page-heading",
+      "scrollY": 0,
+      "title": "Project - imd/acc",
+      "theme": "dark",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "contents": "flex",
+      "select": "flex"
+    }
+  ],
+  "accessibility": [
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 360,
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 360,
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 768,
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 768,
+      "theme": "dark",
+      "violations": []
+    },
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 1280,
+      "theme": "light",
+      "violations": []
+    },
+    {
+      "label": "fixture",
+      "route": "#/projects/0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "width": 1280,
+      "theme": "dark",
+      "violations": []
+    }
+  ],
+  "errors": [],
+  "resourceFailures": []
+}

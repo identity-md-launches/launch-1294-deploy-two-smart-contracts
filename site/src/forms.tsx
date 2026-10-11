@@ -2,7 +2,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import { ADDRESSES as A, REGISTRY, TOKEN } from "./config";
 import {
   checkApplication,
+  checkApplicationProject,
   checkChallenge,
+  checkProject,
+  FormFieldError,
   rpc,
   type ProjectView,
   type Snapshot,
@@ -10,6 +13,7 @@ import {
 import {
   type Application,
   type FieldErrors,
+  address,
   applicationArgs,
   applicationErrors,
   checkedText,
@@ -17,81 +21,28 @@ import {
   key,
   units,
 } from "./model";
-import { Address, CodeBlock, TxStatus } from "./ui";
+import { Address, CodeBlock, ProjectLink, TxStatus } from "./ui";
 import { explainError, type Transactions } from "./wallet";
 
 type Props = { data?: Snapshot; tx: Transactions; ready: boolean; now: number };
 const textHint =
   "Printable ASCII only. No double quotes, backslashes or square brackets.";
-export function ListingForms({ data, tx, ready, now }: Props) {
-  const [tab, setTab] = useState<"apply" | "challenge">("apply");
-  const applyTab = useRef<HTMLButtonElement>(null),
-    challengeTab = useRef<HTMLButtonElement>(null);
+function unavailable(ready: boolean, busy: boolean) {
+  return busy
+    ? "Wait for the current transaction to finish."
+    : !ready
+      ? "Connect on Sepolia and load the contract data to continue."
+      : "";
+}
+function DisabledReason({ id, reason }: { id: string; reason: string }) {
   return (
-    <>
-      <div
-        className="tabs"
-        role="tablist"
-        aria-label="Listing actions"
-        onKeyDown={(e) => {
-          if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
-            e.preventDefault();
-            const next =
-              e.key === "Home"
-                ? "apply"
-                : e.key === "End"
-                  ? "challenge"
-                  : tab === "apply"
-                    ? "challenge"
-                    : "apply";
-            setTab(next);
-            (next === "apply" ? applyTab : challengeTab).current?.focus();
-          }
-        }}
-      >
-        <button
-          ref={applyTab}
-          id="apply-tab"
-          role="tab"
-          aria-selected={tab === "apply"}
-          aria-controls="apply-panel"
-          tabIndex={tab === "apply" ? 0 : -1}
-          onClick={() => setTab("apply")}
-        >
-          Apply
-        </button>
-        <button
-          ref={challengeTab}
-          id="challenge-tab"
-          role="tab"
-          aria-selected={tab === "challenge"}
-          aria-controls="challenge-panel"
-          tabIndex={tab === "challenge" ? 0 : -1}
-          onClick={() => setTab("challenge")}
-        >
-          Challenge
-        </button>
-      </div>
-      <div
-        id="apply-panel"
-        role="tabpanel"
-        aria-labelledby="apply-tab"
-        hidden={tab !== "apply"}
-      >
-        <ApplyForm {...{ data, tx, ready, now }} />
-      </div>
-      <div
-        id="challenge-panel"
-        role="tabpanel"
-        aria-labelledby="challenge-tab"
-        hidden={tab !== "challenge"}
-      >
-        <ChallengeForm {...{ data, tx, ready, now }} />
-      </div>
-    </>
+    <p id={id} className="hint" role="status">
+      {reason}
+    </p>
   );
 }
-function ApplyForm({ data, tx, ready }: Props) {
+
+export function ApplyForm({ data, tx, ready }: Props) {
   const [form, setForm] = useState<Application>({
     project: "",
     name: "",
@@ -99,55 +50,100 @@ function ApplyForm({ data, tx, ready }: Props) {
     rate: "50",
     beneficiary: "",
   });
-  const [errors, setErrors] = useState<FieldErrors>({});
-  const [question, setQuestion] = useState("");
-  const [check, setCheck] = useState(
-    "Complete the fields to read the exact panel question.",
-  );
-  const [checking, setChecking] = useState(false);
-  const [valid, setValid] = useState(false);
+  const [touched, setTouched] = useState<
+    Partial<Record<keyof Application, boolean>>
+  >({});
+  const [attempted, setAttempted] = useState(false);
+  const [remote, setRemote] = useState({
+    project: "",
+    error: "",
+    checked: false,
+  });
+  const [question, setQuestion] = useState({
+    formKey: "",
+    text: "",
+    error: "",
+  });
   const formRef = useRef<HTMLFormElement>(null);
   const formKey = JSON.stringify(form);
+  const localErrors = applicationErrors(form);
+  const current = data?.projects.find(
+    (p) => key(p.address) === key(form.project.trim()),
+  );
+  const registryError = current?.state.ask
+    ? "This project already has an open question. Wait for its outcome."
+    : current?.state.listed
+      ? "Already listed. Open its project page to review or challenge the listing."
+      : "";
+  const remoteError = remote.project === form.project ? remote.error : "";
+  const errors: FieldErrors = {
+    ...localErrors,
+    ...(registryError || remoteError
+      ? { project: registryError || remoteError }
+      : {}),
+  };
+  const projectChecked =
+    remote.project === form.project && remote.checked && !errors.project;
+  const syntaxValid = !Object.keys(localErrors).length;
+  const exactQuestion = question.formKey === formKey ? question : undefined;
   useEffect(() => {
     let cancelled = false;
-    setQuestion("");
-    setValid(false);
-    if (Object.keys(applicationErrors(form)).length) {
-      setCheck("Complete the fields to read the exact panel question.");
-      setChecking(false);
+    setRemote({ project: form.project, error: "", checked: false });
+    try {
+      address(form.project);
+    } catch {
       return;
     }
-    setChecking(true);
-    setCheck("Checking contract code and registry status…");
     const timer = window.setTimeout(async () => {
       try {
-        const exact = await checkApplication(form);
-        if (!cancelled) {
-          setQuestion(exact);
-          setCheck("Contract code and registry status checked.");
-          setValid(true);
-        }
-      } catch (e) {
-        if (!cancelled) setCheck(explainError(e));
-      } finally {
-        if (!cancelled) setChecking(false);
+        await checkApplicationProject(form.project);
+        if (!cancelled)
+          setRemote({ project: form.project, error: "", checked: true });
+      } catch (error) {
+        if (!cancelled)
+          setRemote({
+            project: form.project,
+            error: explainError(error),
+            checked: true,
+          });
       }
-    }, 500);
+    }, 300);
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      clearTimeout(timer);
     };
-  }, [formKey, data?.block]);
-  const update = (field: keyof Application, value: string) => {
-    setForm((old) => ({ ...old, [field]: value }));
-    setErrors((old) => ({ ...old, [field]: undefined }));
-  };
+  }, [form.project, data?.block]);
+  useEffect(() => {
+    let cancelled = false;
+    setQuestion({ formKey, text: "", error: "" });
+    if (!syntaxValid || !projectChecked) return;
+    const timer = window.setTimeout(async () => {
+      try {
+        const text = await checkApplication(form);
+        if (!cancelled) setQuestion({ formKey, text, error: "" });
+      } catch (error) {
+        if (!cancelled) {
+          setQuestion({ formKey, text: "", error: explainError(error) });
+          if (error instanceof FormFieldError)
+            setRemote({
+              project: form.project,
+              error: error.message,
+              checked: true,
+            });
+        }
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [formKey, projectChecked, data?.block]);
   const validate = () => {
-    const next = applicationErrors(form);
-    setErrors(next);
-    if (Object.keys(next).length) {
+    setAttempted(true);
+    const first = Object.entries(errors).find(([, message]) => !!message)?.[0];
+    if (first) {
       formRef.current
-        ?.querySelector<HTMLInputElement>(`[name="${Object.keys(next)[0]}"]`)
+        ?.querySelector<HTMLInputElement>(`[name="${first}"]`)
         ?.focus();
       return false;
     }
@@ -157,8 +153,36 @@ function ApplyForm({ data, tx, ready }: Props) {
     balance = data?.wallet?.oracleBalance ?? 0n;
   const short = balance < fee,
     approved = fee > 0n && data?.wallet?.oracleAllowance === fee;
+  const common = unavailable(ready, tx.busy);
+  const payment =
+    fee === 0n
+      ? "The oracle fee is unavailable. Refresh before continuing."
+      : short
+        ? "Get oracle test IMD to cover the fee first."
+        : "";
+  const mintReason =
+    common || (!short ? "Your balance already covers the oracle fee." : "");
+  const approveReason = registryError || remoteError || common || payment;
+  const sendReason =
+    approveReason ||
+    (!approved ? "Approve exactly the oracle fee before applying." : "");
   const guard = async () => {
-    await checkApplication(form);
+    try {
+      await checkApplication(form);
+    } catch (error) {
+      if (error instanceof FormFieldError) {
+        setAttempted(true);
+        setRemote({
+          project: form.project,
+          error: error.message,
+          checked: true,
+        });
+        formRef.current
+          ?.querySelector<HTMLInputElement>('[name="project"]')
+          ?.focus();
+      }
+      throw error;
+    }
     const live = (await rpc.read(
       A.ProjectRegistry,
       REGISTRY,
@@ -178,45 +202,51 @@ function ApplyForm({ data, tx, ready }: Props) {
     label: string,
     props: Record<string, unknown> = {},
     hint?: string,
-  ) => (
-    <div className={`field ${name === "rate" ? "rate-field" : ""}`}>
-      <label htmlFor={`apply-${name}`}>{label}</label>
-      <input
-        id={`apply-${name}`}
-        name={name}
-        value={form[name]}
-        onChange={(e) => update(name, e.target.value)}
-        autoComplete="off"
-        spellCheck={false}
-        aria-invalid={!!errors[name]}
-        aria-describedby={
-          errors[name]
-            ? `apply-${name}-error`
-            : hint
-              ? `apply-${name}-hint`
-              : undefined
-        }
-        {...props}
-      />
-      {hint && (
-        <p id={`apply-${name}-hint`} className="hint">
-          {hint}
+  ) => {
+    const error = touched[name] || attempted ? errors[name] : undefined;
+    return (
+      <div className={`field ${name === "rate" ? "rate-field" : ""}`}>
+        <label htmlFor={`apply-${name}`}>{label}</label>
+        <input
+          id={`apply-${name}`}
+          name={name}
+          value={form[name]}
+          onChange={(event) =>
+            setForm((old) => ({ ...old, [name]: event.target.value }))
+          }
+          onBlur={() => setTouched((old) => ({ ...old, [name]: true }))}
+          autoComplete="off"
+          spellCheck={false}
+          aria-invalid={!!error}
+          aria-describedby={
+            [
+              hint ? `apply-${name}-hint` : "",
+              error ? `apply-${name}-error` : "",
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
+          {...props}
+        />
+        {hint && (
+          <p id={`apply-${name}-hint`} className="hint">
+            {hint}
+          </p>
+        )}
+        <p id={`apply-${name}-error`} className="hint alarm" role="status">
+          {error}
         </p>
-      )}
-      {errors[name] && (
-        <p id={`apply-${name}-error`} className="hint alarm">
-          {errors[name]}
-        </p>
-      )}
-    </div>
-  );
+      </div>
+    );
+  };
   return (
     <form
+      id="apply-panel"
       ref={formRef}
       noValidate
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!validate()) return;
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!validate() || sendReason) return;
         void tx.run(
           "apply",
           A.ProjectRegistry,
@@ -239,14 +269,14 @@ function ApplyForm({ data, tx, ready }: Props) {
     >
       <p>
         Apply for trading cashback to earn points.{" "}
-        <a href="#/docs/get-listed">Read the listing rules</a>.
+        <a href="#/docs/listing">Read the listing rules</a>.
       </p>
       {field("project", "Project contract", { placeholder: "0x…" })}
-      {field("name", "Project name", { maxLength: 48 }, "1–48 characters.")}
+      {field("name", "Project name", {}, "1–48 characters.")}
       {field(
         "url",
         "Verified source URL",
-        { type: "url", maxLength: 200, placeholder: "https://" },
+        { type: "url", placeholder: "https://" },
         "12–200 characters, starting with https://.",
       )}
       <p className="hint">{textHint}</p>
@@ -272,22 +302,16 @@ function ApplyForm({ data, tx, ready }: Props) {
           "Loading the live oracle fee…"
         )}
       </p>
-      {data?.fee === 0n && (
-        <p className="alarm secondary">
-          The oracle is not accepting this payment token. Try again later.
-        </p>
-      )}
       <ol className="steps">
         <li>
-          <div>
-            <strong>Get test IMD if short</strong>
-            <p className="hint">
-              Mints 10 oracle test IMD. This is separate from the staking token.
-            </p>
-          </div>
+          <strong>Get test IMD if short</strong>
+          <p className="hint">
+            Mints 10 oracle test IMD. This is separate from the staking token.
+          </p>
           <button
             type="button"
-            disabled={!ready || tx.busy || !short}
+            disabled={!!mintReason}
+            aria-describedby="mint-apply-disabled"
             onClick={() =>
               void tx.run("mint-apply", A.OracleIMD, TOKEN, "mint", [
                 data?.wallet?.account,
@@ -301,20 +325,20 @@ function ApplyForm({ data, tx, ready }: Props) {
                 ? "Get 10 test IMD"
                 : "Balance ready"}
           </button>
+          <DisabledReason id="mint-apply-disabled" reason={mintReason} />
           <TxStatus state={tx.states["mint-apply"]} />
         </li>
         <li>
-          <div>
-            <strong>Approve the oracle fee</strong>
-            <p className="hint">
-              {data
-                ? `${units(fee)} oracle test IMD to ProjectRegistry.`
-                : "Waiting for the fee."}
-            </p>
-          </div>
+          <strong>Approve the oracle fee</strong>
+          <p className="hint">
+            {data
+              ? `${units(fee)} oracle test IMD to ProjectRegistry.`
+              : "Waiting for the fee."}
+          </p>
           <button
             type="button"
-            disabled={!ready || tx.busy || short || fee === 0n}
+            disabled={!!approveReason}
+            aria-describedby="approve-apply-disabled"
             onClick={() => {
               if (validate())
                 void tx.run(
@@ -333,86 +357,151 @@ function ApplyForm({ data, tx, ready }: Props) {
                 ? "Approve again"
                 : "Approve fee"}
           </button>
+          <DisabledReason id="approve-apply-disabled" reason={approveReason} />
           <TxStatus state={tx.states["approve-apply"]} />
         </li>
         <li>
-          <div>
-            <strong>Send the application</strong>
-            <p className="hint">The panel answers in a few minutes.</p>
-          </div>
+          <strong>Send the application</strong>
+          <p className="hint">The panel answers in a few minutes.</p>
           <button
             type="submit"
-            disabled={!ready || tx.busy || !approved || short}
+            disabled={!!sendReason}
+            aria-describedby="send-apply-disabled"
           >
             {tx.states.apply?.phase === "pending"
               ? "Applying…"
               : "Apply for listing"}
           </button>
+          <DisabledReason id="send-apply-disabled" reason={sendReason} />
           <TxStatus state={tx.states.apply} />
         </li>
       </ol>
-      {!ready && (
-        <p className="hint">
-          Connect on Sepolia and load the contract data to continue.
-        </p>
-      )}
       <h3>The panel question</h3>
-      <p className={`secondary ${valid ? "ok" : ""}`} role="status">
-        {checking ? "Checking contract code and registry status…" : check}
+      <p
+        className={`secondary ${exactQuestion?.text ? "ok" : ""}`}
+        role="status"
+      >
+        {registryError || remoteError ||
+          exactQuestion?.error ||
+          (!syntaxValid
+            ? "Complete the fields to read the exact panel question."
+            : exactQuestion?.text
+              ? "Contract code and registry status checked."
+              : "Checking contract code and registry status…")}
       </p>
-      {question && <CodeBlock code={question} label="Copy question" />}
+      {exactQuestion?.text && !errors.project && (
+        <CodeBlock code={exactQuestion.text} label="Copy question" />
+      )}
     </form>
   );
 }
-function ChallengeForm({ data, tx, ready, now }: Props) {
-  const [selected, setSelected] = useState(""),
-    [reason, setReason] = useState(""),
-    [error, setError] = useState("");
-  const reasonRef = useRef<HTMLTextAreaElement>(null);
-  const available = data?.projects.filter((p) => p.state.listed) ?? [];
-  const project = available.find((p) => key(p.address) === key(selected));
-  const fee = data?.fee ?? 0n,
-    bond = data?.bond ?? 0n,
+
+export function ChallengeForm({
+  data,
+  project,
+  tx,
+  ready,
+  now,
+}: Props & { data: Snapshot; project: ProjectView }) {
+  const [reason, setReason] = useState("");
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [attempted, setAttempted] = useState(false);
+  const [remote, setRemote] = useState<
+    Partial<Record<"project" | "reason" | "beneficiary", string>>
+  >({});
+  const formRef = useRef<HTMLFormElement>(null);
+  const wait = Math.max(0, Number(project.state.challengeOpenAt) - now);
+  const eligibility =
+    project.state.ask !== 0n
+      ? "This project already has an open question."
+      : !project.state.listed
+        ? "This project is no longer listed."
+        : wait > 0
+          ? `The listing cooldown is not over. Challenge opens ${new Date(Number(project.state.challengeOpenAt) * 1000).toLocaleString()} (in ${duration(wait)}).`
+          : "";
+  const errors: Partial<Record<"project" | "reason" | "beneficiary", string>> =
+    { ...remote };
+  if (eligibility) errors.project = eligibility;
+  try {
+    checkedText(reason, 1, 280, "Reason");
+  } catch (error) {
+    errors.reason = (error as Error).message;
+  }
+  try {
+    address(project.state.beneficiary);
+  } catch (error) {
+    errors.beneficiary = (error as Error).message;
+  }
+  useEffect(() => setRemote({}), [data.block]);
+  const fee = data.fee,
+    bond = data.bond,
     cost = fee + bond;
-  const balance = data?.wallet?.oracleBalance ?? 0n;
-  const wait = project
-    ? Math.max(0, Number(project.state.challengeOpenAt) - now)
-    : 0;
-  const canAsk = project && project.state.ask === 0n && wait === 0;
-  const approved = cost > 0n && data?.wallet?.oracleAllowance === cost;
+  const balance = data.wallet?.oracleBalance ?? 0n;
+  const approved = cost > 0n && data.wallet?.oracleAllowance === cost;
+  const common = unavailable(ready, tx.busy);
+  const approveReason =
+    errors.project ||
+    errors.beneficiary ||
+    common ||
+    (fee === 0n
+      ? "The oracle fee is unavailable. Refresh before continuing."
+      : balance < cost
+        ? "Get oracle test IMD to cover the fee and bond first."
+        : "");
+  const sendReason =
+    approveReason ||
+    (!approved ? "Approve exactly the fee plus bond before challenging." : "");
   const validate = () => {
-    if (!project) {
-      setError("Select a listed project.");
-      document.getElementById("challenge-project")?.focus();
+    setAttempted(true);
+    const first = Object.entries(errors).find(([, message]) => !!message)?.[0];
+    if (first) {
+      formRef.current
+        ?.querySelector<HTMLElement>(`#challenge-${first}`)
+        ?.focus();
       return false;
     }
-    try {
-      checkedText(reason, 1, 280, "Reason");
-      setError("");
-      return true;
-    } catch (e) {
-      setError(explainError(e));
-      reasonRef.current?.focus();
-      return false;
-    }
+    return true;
   };
   const guard = async () => {
-    if (!project) throw new Error("Select a listed project.");
-    await checkChallenge(
-      project.address,
-      reason,
-      project.state.beneficiary,
-      fee,
-    );
+    try {
+      await checkProject(project.address);
+      await checkChallenge(
+        project.address,
+        reason,
+        project.state.beneficiary,
+        fee,
+      );
+    } catch (error) {
+      if (error instanceof FormFieldError) {
+        setRemote((old) => ({ ...old, [error.field]: error.message }));
+        setAttempted(true);
+        formRef.current
+          ?.querySelector<HTMLElement>(`#challenge-${error.field}`)
+          ?.focus();
+      }
+      throw error;
+    }
   };
+  const errorFor = (field: keyof typeof errors) =>
+    attempted || touched[field] ? errors[field] : undefined;
+  const id = (action: string) => `${action}-${key(project.address)}`;
+  const fieldProps = (field: keyof typeof errors) => ({
+    id: `challenge-${field}`,
+    name: field,
+    "aria-invalid": !!errorFor(field),
+    "aria-describedby": `challenge-${field}-hint challenge-${field}-error`,
+    onBlur: () => setTouched((old) => ({ ...old, [field]: true })),
+  });
   return (
     <form
+      id="challenge-panel"
+      ref={formRef}
       noValidate
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!validate() || !project) return;
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!validate() || sendReason) return;
         void tx.run(
-          "challenge",
+          id("challenge"),
           A.ProjectRegistry,
           REGISTRY,
           "challengeForBeneficiary",
@@ -421,7 +510,7 @@ function ChallengeForm({ data, tx, ready, now }: Props) {
             await guard();
             if (
               (await rpc.read(A.OracleIMD, TOKEN, "allowance", [
-                data?.wallet?.account,
+                data.wallet?.account,
                 A.ProjectRegistry,
               ])) !== cost
             )
@@ -438,99 +527,86 @@ function ChallengeForm({ data, tx, ready, now }: Props) {
       </p>
       <div className="field">
         <label htmlFor="challenge-project">Listed project</label>
-        <select
-          id="challenge-project"
-          value={selected}
-          onChange={(e) => {
-            setSelected(e.target.value);
-            setError("");
-          }}
-        >
-          <option value="">Select a project</option>
-          {available.map((p) => (
-            <option key={p.address} value={p.address}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <input {...fieldProps("project")} value={project.address} readOnly />
+        <p id="challenge-project-hint" className="hint">
+          {project.name}. This challenge is for the project on this page.
+        </p>
+        <p id="challenge-project-error" className="hint alarm" role="status">
+          {errorFor("project")}
+        </p>
       </div>
-      {data && !available.length && (
-        <p className="dim">No listed projects to challenge yet.</p>
-      )}
-      {project && (
-        <>
-          <p className="secondary">
-            Beneficiary: <Address value={project.state.beneficiary} copy />
-          </p>
-          <p className="secondary">
-            {project.state.ask !== 0n
-              ? "An open question must settle before another challenge."
-              : wait > 0
-                ? `Challenge opens in ${duration(wait)} (${new Date(Number(project.state.challengeOpenAt) * 1000).toLocaleString()}).`
-                : "The listing cooldown has ended."}
-          </p>
-        </>
-      )}
+      <div className="field">
+        <label htmlFor="challenge-beneficiary">Beneficiary</label>
+        <input
+          {...fieldProps("beneficiary")}
+          value={project.state.beneficiary}
+          readOnly
+        />
+        <p id="challenge-beneficiary-hint" className="hint">
+          Review this beneficiary. The transaction pins this address and reverts
+          if it changes. <Address value={project.state.beneficiary} copy />
+        </p>
+        <p
+          id="challenge-beneficiary-error"
+          className="hint alarm"
+          role="status"
+        >
+          {errorFor("beneficiary")}
+        </p>
+      </div>
       <div className="field">
         <label htmlFor="challenge-reason">Reason</label>
         <textarea
-          ref={reasonRef}
-          id="challenge-reason"
+          {...fieldProps("reason")}
           value={reason}
-          onChange={(e) => {
-            setReason(e.target.value);
-            setError("");
-          }}
-          maxLength={280}
           rows={4}
-          aria-invalid={!!error}
-          aria-describedby="reason-hint challenge-error"
+          onChange={(event) => {
+            setReason(event.target.value);
+            setRemote((old) => ({ ...old, reason: undefined }));
+          }}
         />
-        <p id="reason-hint" className="hint">
+        <p id="challenge-reason-hint" className="hint">
           1–280 characters. {textHint}
         </p>
-        <p id="challenge-error" className="hint alarm" role="status">
-          {error}
+        <p id="challenge-reason-error" className="hint alarm" role="status">
+          {errorFor("reason")}
         </p>
       </div>
       <p className="secondary">
-        {data ? (
-          <>
-            Fee {units(fee)} + bond {units(bond)} ={" "}
-            <strong>{units(cost)} oracle test IMD</strong>. Balance:{" "}
-            {data.wallet ? units(balance) : "connect to see"}.
-          </>
-        ) : (
-          "Loading the live fee and bond…"
-        )}
+        Fee {units(fee)} + bond {units(bond)} ={" "}
+        <strong>{units(cost)} oracle test IMD</strong>. Balance:{" "}
+        {data.wallet ? units(balance) : "connect to see"}.
       </p>
-      {data?.wallet && balance < cost && (
-        <>
+      {balance < cost && (
+        <div className="action-block">
           <button
             type="button"
-            disabled={!ready || tx.busy}
+            disabled={!!common}
+            aria-describedby="mint-challenge-disabled"
             onClick={() =>
-              void tx.run("mint-challenge", A.OracleIMD, TOKEN, "mint", [
-                data.wallet!.account,
+              void tx.run(id("mint-challenge"), A.OracleIMD, TOKEN, "mint", [
+                data.wallet?.account,
                 10n ** 19n,
               ])
             }
           >
-            Get 10 test IMD
+            {tx.states[id("mint-challenge")]?.phase === "pending"
+              ? "Minting…"
+              : "Get 10 test IMD"}
           </button>
-          <TxStatus state={tx.states["mint-challenge"]} />
-        </>
+          <DisabledReason id="mint-challenge-disabled" reason={common} />
+          <TxStatus state={tx.states[id("mint-challenge")]} />
+        </div>
       )}
-      <div className="actions">
+      <div className="action-block">
         <button
           type="button"
-          disabled={
-            !ready || tx.busy || !canAsk || balance < cost || fee === 0n
-          }
+          disabled={!!approveReason}
+          aria-describedby="approve-challenge-disabled"
           onClick={() => {
             if (validate())
               void tx.run(
-                "approve-challenge",
+                id("approve-challenge"),
                 A.OracleIMD,
                 TOKEN,
                 "approve",
@@ -539,26 +615,29 @@ function ChallengeForm({ data, tx, ready, now }: Props) {
               );
           }}
         >
-          {tx.states["approve-challenge"]?.phase === "pending"
+          {tx.states[id("approve-challenge")]?.phase === "pending"
             ? "Approving…"
             : "Approve fee + bond"}
         </button>
+        <DisabledReason
+          id="approve-challenge-disabled"
+          reason={approveReason}
+        />
+        <TxStatus state={tx.states[id("approve-challenge")]} />
+      </div>
+      <div className="action-block">
         <button
           type="submit"
-          disabled={!ready || tx.busy || !canAsk || !approved || balance < cost}
+          disabled={!!sendReason}
+          aria-describedby="send-challenge-disabled"
         >
-          {tx.states.challenge?.phase === "pending"
+          {tx.states[id("challenge")]?.phase === "pending"
             ? "Challenging…"
             : "Challenge listing"}
         </button>
+        <DisabledReason id="send-challenge-disabled" reason={sendReason} />
+        <TxStatus state={tx.states[id("challenge")]} />
       </div>
-      <TxStatus state={tx.states["approve-challenge"]} />
-      <TxStatus state={tx.states.challenge} />
-      {!ready && (
-        <p className="hint">
-          Connect on Sepolia and load the contract data to continue.
-        </p>
-      )}
     </form>
   );
 }
@@ -574,7 +653,9 @@ export function OpenQuestion({
   const expires = Number(state.askedAt + data.expiry) + 1;
   return (
     <article className="question-row" aria-labelledby={id}>
-      <h3 id={id}>{p.name}</h3>
+      <h3 id={id}>
+        <ProjectLink value={p.address} label={p.name} />
+      </h3>
       <p className="secondary">
         <Address value={p.address} /> ·{" "}
         {state.ask === 1n ? "Application" : "Challenge"}
@@ -615,6 +696,15 @@ export function OpenQuestion({
           ? "Expiring…"
           : "Expire"}
       </button>
+      <p className="hint">
+        {!ready
+          ? "Connect on Sepolia and load the contract data to expire this question."
+          : tx.busy
+            ? "Wait for the current transaction to finish."
+            : !p.canExpire
+              ? `Expiry is available after ${new Date(expires * 1000).toLocaleString()}, or once the Intake completes the request. Refresh to check.`
+              : "This question can be expired now."}
+      </p>
       <TxStatus state={tx.states[`expire-${p.address}`]} />
     </article>
   );

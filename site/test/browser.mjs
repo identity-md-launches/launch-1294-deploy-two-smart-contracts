@@ -1,26 +1,22 @@
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { chromium } from "@playwright/test";
+import { resolve, extname } from "node:path";
+import { spawn } from "node:child_process";
+import { chromium, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { Interface, Wallet } from "ethers";
+import { injectForkWallet } from "./fork-wallet.mjs";
+import { checkRegistryFixtures } from "./fixtures.mjs";
 
-const base = process.env.PREVIEW_URL || "http://127.0.0.1:4173/preview/";
-const output = process.env.EVIDENCE_DIR || "/tmp/imd-acc-browser-evidence";
-const fork = process.env.FORK_RPC;
-const mode = process.env.CHECK_MODE || "all";
-if (mode === "fork" && !fork)
-  throw new Error("CHECK_MODE=fork requires FORK_RPC.");
-if (
-  fork &&
-  !["127.0.0.1", "localhost", "[::1]"].includes(new URL(fork).hostname)
-) {
-  throw new Error("FORK_RPC must point to a local Anvil fork.");
-}
-const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH || undefined,
-  headless: true,
-});
+const output = process.env.EVIDENCE_DIR || "/tmp/imd-acc-routes-evidence";
+const mode = process.env.CHECK_MODE || "live";
+const exportDir = resolve(
+  process.env.EXPORT_DIR || new URL("../../dist", import.meta.url).pathname,
+);
+const executablePath =
+  process.env.CHROMIUM_PATH ||
+  "/opt/imd-tools/ms-playwright/chromium-1246/chrome-linux64/chrome";
 const deployment = JSON.parse(
   await readFile(new URL("../src/deployment.json", import.meta.url), "utf8"),
 );
@@ -36,16 +32,71 @@ const registryInterface = new Interface(
     ),
   ),
 );
-await mkdir(output, { recursive: true });
+const rpcPattern =
+  /https:\/\/(rpc\.sepolia\.ethpandaops\.io|sepolia\.rpc\.sentio\.xyz|ethereum-sepolia-rpc\.publicnode\.com)\/?$/;
+const sections = [
+  "what",
+  "how",
+  "addresses",
+  "integrate",
+  "listing",
+  "points",
+  "agents",
+];
+const routes = [
+  "#/",
+  "#/stack",
+  "#/projects",
+  `#/projects/${stacker}`,
+  "#/apply",
+  "#/leaderboard",
+  ...sections.map((s) => `#/docs/${s}`),
+  "#/missing-page",
+];
 const report = {
   mode,
   checkedAt: new Date().toISOString(),
-  live: [],
-  fork: [],
-  errors: [],
-  accessibility: [],
+  browser: "",
+  blocks: [],
+  checks: [],
   measurements: [],
+  accessibility: [],
+  errors: [],
+  resourceFailures: [],
 };
+await mkdir(output, { recursive: true });
+const server = createServer(async (req, res) => {
+  const path = decodeURIComponent(
+    new URL(req.url, "http://local").pathname,
+  ).replace(/^\/preview\//, "");
+  const file = resolve(exportDir, path === "" ? "index.html" : path);
+  if (!file.startsWith(exportDir + "/")) {
+    res.writeHead(404).end();
+    return;
+  }
+  try {
+    const bytes = await readFile(file);
+    const mime =
+      {
+        ".html": "text/html",
+        ".js": "text/javascript",
+        ".css": "text/css",
+        ".svg": "image/svg+xml",
+        ".woff2": "font/woff2",
+        ".png": "image/png",
+        ".txt": "text/plain",
+      }[extname(file)] || "application/octet-stream";
+    res.writeHead(200, { "content-type": mime }).end(bytes);
+  } catch {
+    res.writeHead(404).end();
+  }
+});
+await new Promise((done) => server.listen(0, "127.0.0.1", done));
+const base = `http://127.0.0.1:${server.address().port}/preview/`;
+const browser = await chromium.launch({ executablePath, headless: true });
+report.browser = browser.version();
+let anvil;
+let fork;
 const rpc = async (method, params = []) => {
   const response = await fetch(fork, {
     method: "POST",
@@ -56,416 +107,529 @@ const rpc = async (method, params = []) => {
   if (body.error) throw new Error(body.error.message);
   return body.result;
 };
-const until = async (page, predicate, label, timeout = 60000) => {
-  await page.waitForFunction(predicate, undefined, { timeout });
-  report.fork.push(label);
-  console.log(label);
+function observe(page) {
+  page.on("pageerror", (error) => report.errors.push(error.message));
+  page.on("console", (entry) => {
+    if (entry.type() === "error") report.errors.push(entry.text());
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400)
+      report.resourceFailures.push({
+        url: response.url(),
+        status: response.status(),
+      });
+  });
+}
+const note = (text) => {
+  report.checks.push(text);
+  console.log(text);
 };
-try {
-  if (mode !== "fork") {
-    const context = await browser.newContext({
-      viewport: { width: 1280, height: 900 },
-    });
-    const page = await context.newPage();
-    page.on("pageerror", (e) => report.errors.push(e.message));
-    page.on("console", (e) => {
-      if (e.type() === "error") report.errors.push(e.text());
-    });
-    await page.goto(base, { waitUntil: "networkidle" });
-    await page.getByText(/Data at block/).waitFor({ timeout: 90000 });
-    report.live.push(await page.locator(".data-line").innerText());
-    assert.equal(
-      await page
-        .locator(".alarm")
-        .filter({ hasText: /Sepolia data is unavailable/ })
-        .count(),
-      0,
-    );
-    for (const width of [360, 390, 768, 1280])
-      for (const theme of ["light", "dark"]) {
-        await page.setViewportSize({ width, height: 900 });
-        if ((await page.locator("html").getAttribute("data-theme")) !== theme)
-          await page.locator(".theme-button").click();
-        for (const route of ["#/", "#/docs"]) {
-          await page.goto(base + route, { waitUntil: "networkidle" });
-          await page
-            .getByText(/Data at block/)
-            .first()
-            .waitFor({
-              state: route === "#/" ? "visible" : "attached",
-              timeout: 60000,
-            });
-          await page.evaluate(() => document.fonts.ready);
-          const result = await page.evaluate(() => ({
+const navigate = async (page, hash) => {
+  await page.evaluate((hash) => {
+    location.hash = hash;
+  }, hash);
+  await expect(page).toHaveURL(base + hash);
+  await expect(page.locator("#page-heading")).toBeFocused();
+};
+async function ready(page) {
+  await expect(page.locator(".data-line")).toContainText("Data at block", {
+    timeout: 90000,
+  });
+  await expect(
+    page.getByRole("button", { name: "Refresh", exact: true }),
+  ).toBeEnabled({ timeout: 90000 });
+}
+async function matrix(page, label, allRoutes = routes) {
+  for (const width of [360, 768, 1280])
+    for (const theme of ["light", "dark"]) {
+      await page.setViewportSize({ width, height: 900 });
+      if ((await page.locator("html").getAttribute("data-theme")) !== theme)
+        await page.locator(".theme-button").click();
+      await page.waitForFunction(() => {
+        const dark = document.documentElement.dataset.theme === "dark";
+        return (
+          getComputedStyle(document.querySelector(".connect-button")).color ===
+          (dark ? "rgb(255, 255, 255)" : "rgb(0, 0, 0)")
+        );
+      });
+      for (const route of allRoutes) {
+        if (new URL(page.url()).hash === route)
+          await page.locator("#page-heading").focus();
+        else await navigate(page, route);
+        await page.evaluate(() => document.fonts.ready);
+        const measurement = await page.evaluate(() => {
+          const bar = document.querySelector(".topbar-inner");
+          const center = (node) => {
+            const r = node.getBoundingClientRect();
+            return r.y + r.height / 2;
+          };
+          const controls = [...bar.children].filter(
+            (node) => getComputedStyle(node).display !== "none",
+          );
+          return {
             width: innerWidth,
             scroll: document.documentElement.scrollWidth,
+            barWidth: bar.scrollWidth,
+            barHeight: bar.getBoundingClientRect().height,
+            centers: controls.map(center),
+            focus: document.activeElement.id,
+            scrollY,
+            title: document.title,
             theme: document.documentElement.dataset.theme,
-            headerHeight: document
-              .querySelector(".topbar-inner")
-              .getBoundingClientRect().height,
-            heading: getComputedStyle(
-              document.querySelector("main:not([hidden]) h1"),
-            ).fontSize,
-            fonts: [...document.fonts].map((f) => `${f.weight}:${f.status}`),
-            connect: document
-              .querySelector(".intro-stack button")
-              .getBoundingClientRect().bottom,
-          }));
-          assert.equal(
-            result.scroll,
-            width,
-            `overflow: ${width} ${theme} ${route}`,
-          );
-          assert.ok(result.fonts.every((f) => f.endsWith("loaded")));
-          if (route === "#/" && width === 390)
-            assert.ok(
-              result.connect < 844,
-              "primary action above first screen",
-            );
-          if (width === 360)
-            assert.ok(result.headerHeight < 60, "one-row topbar");
-          const axe = await new AxeBuilder({ page })
-            .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
-            .analyze();
-          report.accessibility.push({
-            width,
-            theme,
-            route,
-            violations: axe.violations.map((v) => ({
-              id: v.id,
-              nodes: v.nodes.map((n) => n.target),
-            })),
-          });
-          assert.equal(
-            axe.violations.length,
-            0,
-            JSON.stringify(
-              axe.violations.map((v) => ({
-                id: v.id,
-                nodes: v.nodes.map((n) => n.target),
-              })),
+            fonts: [...document.fonts].map(
+              (font) => `${font.weight}:${font.status}`,
             ),
+            contents: getComputedStyle(
+              document.querySelector(".contents") || bar,
+            ).display,
+            select: getComputedStyle(
+              document.querySelector(".docs-select") || bar,
+            ).display,
+          };
+        });
+        assert.equal(
+          measurement.scroll,
+          width,
+          `${label} ${route} ${width} ${theme}: page overflow`,
+        );
+        assert.ok(measurement.barWidth <= width, "bar has no scroll");
+        assert.ok(
+          Math.max(...measurement.centers) - Math.min(...measurement.centers) <
+            2,
+          "bar is one row",
+        );
+        assert.equal(measurement.scrollY, 0, "route scrolls to top");
+        assert.ok(
+          measurement.fonts.every((font) => font.endsWith("loaded")),
+          "local fonts loaded",
+        );
+        assert.match(measurement.title, / - imd\/acc$/);
+        assert.equal(await page.locator("main h1").count(), 1);
+        if (!route.startsWith("#/docs/") && route !== "#/missing-page")
+          await expect(page.locator(".data-line")).toContainText(
+            "Data at block",
           );
-          report.measurements.push({ route, ...result });
-          if (width !== 390)
-            await page.screenshot({
-              path: resolve(
-                output,
-                `${route === "#/" ? "app" : "docs"}-${width}-${theme}.png`,
-              ),
-              type: "png",
-            });
+        if (route.startsWith("#/docs/")) {
+          assert.equal(measurement.contents === "none", width < 860);
+          assert.equal(measurement.select === "none", width >= 860);
+          assert.equal(
+            await page.locator(".docs-content > section").count(),
+            1,
+          );
         }
+        const axe = await new AxeBuilder({ page })
+          .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+          .analyze();
+        const violations = axe.violations.map((v) => ({
+          id: v.id,
+          nodes: v.nodes.map((n) => n.target),
+        }));
+        report.accessibility.push({ label, route, width, theme, violations });
+        assert.deepEqual(violations, [], `${route} ${width} ${theme}`);
+        report.measurements.push({ label, route, ...measurement });
+        await page.screenshot({
+          path: resolve(
+            output,
+            `${label}-${route.replace(/[^a-z0-9]/gi, "_")}-${width}-${theme}.jpg`,
+          ),
+          type: "jpeg",
+          quality: 72,
+        });
       }
-    await page.goto(base + "#/docs/for-agents");
-    assert.equal(
-      await page.evaluate(() => document.activeElement.id),
-      "for-agents",
+      console.log(
+        `${label}: all ${allRoutes.length} routes checked at ${width}px ${theme}`,
+      );
+    }
+}
+async function menus(page) {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await navigate(page, "#/");
+  const button = page.getByRole("button", { name: "Menu", exact: true });
+  const menu = page.locator("#mobile-navigation");
+  await button.click();
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+  await expect(button).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeVisible();
+  await page.locator("#page-heading").click();
+  await expect(menu).toBeHidden();
+  await expect(button).toBeFocused();
+  await page.keyboard.press("Space");
+  await page.keyboard.press("Tab");
+  // Theme and wallet follow Menu in the single control row, then the list.
+  await expect(page.locator(".theme-button")).toBeFocused();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(
+    menu.getByRole("link", { name: "Home", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(base + "#/stack");
+  await expect(page.locator("#page-heading")).toBeFocused();
+  await expect(menu).toBeHidden();
+  await button.click();
+  await menu.getByRole("link", { name: "Projects", exact: true }).click();
+  await expect(page.locator("#page-heading")).toHaveText("Projects");
+  await expect(page.locator('.mobile-nav [aria-current="page"]')).toHaveText(
+    "Projects",
+  );
+  await page.goBack();
+  await expect(page.locator("#page-heading")).toHaveText("Your stack");
+  await page.goForward();
+  await expect(page.locator("#page-heading")).toHaveText("Projects");
+  note(
+    "Menu: mouse, Enter, Space, Tab navigation, Escape, outside click, focus return, current page and browser back/forward passed.",
+  );
+}
+async function formErrors(page, eoa) {
+  await navigate(page, "#/apply");
+  const cases = [
+    ["project", "not an address", /valid Ethereum address/],
+    ["project", eoa, /no contract code/],
+    ["name", "", /too short/],
+    ["name", "x".repeat(49), /too long/],
+    ["name", 'a"b', /double quote/],
+    ["name", "a\\b", /backslash/],
+    ["name", "[a]", /square bracket/],
+    ["name", "café", /non-ASCII/],
+    ["url", "http://example.test/source", /https:\/\//],
+    ["url", "https://a", /too short/],
+    ["url", "https://" + "x".repeat(200), /too long/],
+    ["rate", "24", /25 to 100/],
+    ["rate", "101", /25 to 100/],
+    ["rate", "25.5", /whole number/],
+    ["beneficiary", "wrong", /valid Ethereum address/],
+    ["beneficiary", "0x" + "0".repeat(40), /must not be zero/],
+  ];
+  for (const [field, value, expected] of cases) {
+    const input = page.locator(`#apply-${field}`);
+    await input.fill(value);
+    await input.focus();
+    await page.keyboard.press("Tab");
+    await expect(page.locator(`#apply-${field}-error`)).toHaveText(expected, {
+      timeout: 30000,
+    });
+    await expect(input).toHaveAttribute("aria-invalid", "true");
+    assert.match(
+      await input.getAttribute("aria-describedby"),
+      new RegExp(`apply-${field}-error`),
     );
-    const text = await page.locator("#for-agents pre").innerText();
+    assert.equal(
+      await page
+        .locator(`#apply-${field}-error`)
+        .evaluate((node) => getComputedStyle(node).color),
+      await page
+        .evaluate(() =>
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--alarm")
+            .trim(),
+        )
+        .then((hex) =>
+          hex === "#b3261e" ? "rgb(179, 38, 30)" : "rgb(255, 107, 98)",
+        ),
+    );
+  }
+  note(
+    `${cases.length} Apply blur-error cases identify the reason, use alarm, aria-invalid and aria-describedby.`,
+  );
+}
+try {
+  if (mode === "live") {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+    });
+    const page = await context.newPage();
+    observe(page);
+    let logReads = 0;
+    page.on("request", (request) => {
+      if (request.postData()?.includes('"eth_getLogs"')) logReads++;
+    });
+    await page.goto(base);
+    await ready(page);
+    report.blocks.push(await page.locator(".data-line").innerText());
+    const start = logReads;
+    for (const route of routes) await navigate(page, route);
+    assert.equal(logReads, start, "route changes never scan logs");
+    note(
+      `All ${routes.length} routes reuse the existing snapshot with zero additional log scans.`,
+    );
+    await navigate(page, "#/");
+    const first = await page
+      .getByRole("button", { name: "Connect wallet", exact: true })
+      .boundingBox();
+    assert.ok(
+      first.y + first.height < 844,
+      "390px first screen has the main action",
+    );
+    note(
+      `390px first-screen Connect wallet bottom: ${Math.round(first.y + first.height)}px.`,
+    );
+    await matrix(page, "live");
+    await menus(page);
+    for (const route of routes) {
+      await page.goto(base + route);
+      await expect(page.locator("#page-heading")).toBeFocused();
+      await page.reload();
+      await expect(page.locator("#page-heading")).toBeFocused();
+      assert.equal(new URL(page.url()).hash, route);
+    }
+    note(
+      "All 14 deep links and reloads work at /preview/ with relative static assets.",
+    );
+    await navigate(page, "#/docs/what");
+    await page.locator("#docs-section").selectOption("how");
+    await expect(page.locator("#page-heading")).toHaveText("How it works");
+    await page
+      .getByRole("link", { name: "Next: Addresses →", exact: true })
+      .click();
+    await expect(page.locator("#page-heading")).toHaveText("Addresses");
+    await page
+      .getByRole("link", { name: "← Previous: How it works", exact: true })
+      .click();
+    await expect(page.locator("#page-heading")).toHaveText("How it works");
+    await navigate(page, "#/docs/agents");
+    const agentText = await page.locator("#docs-agents pre").innerText();
     const download = await context.request.get(base + "llms.txt");
-    assert.equal(download.status(), 200);
-    assert.equal((await download.text()).trim(), text.trim());
+    assert.equal((await download.text()).trim(), agentText.trim());
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page
       .getByRole("button", { name: "Copy agent guide", exact: true })
       .click();
     assert.equal(
       (await page.evaluate(() => navigator.clipboard.readText())).trim(),
-      text.trim(),
+      agentText.trim(),
     );
-    report.live.push("Docs anchor, llms.txt and copy agent guide passed.");
-    await page.goto(base + "#/");
-    await page.getByRole("button", { name: "Switch to light theme" }).click();
+    note(
+      "Docs select, previous/next links, agent guide copy and byte-equivalent llms.txt passed.",
+    );
+    await page.locator(".theme-button").click();
+    const theme = await page.locator("html").getAttribute("data-theme");
     await page.reload();
-    assert.equal(
-      await page.locator("html").getAttribute("data-theme"),
-      "light",
-    );
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     await page.emulateMedia({ reducedMotion: "reduce" });
     assert.equal(
       await page
         .locator(".connect-button")
-        .evaluate((e) => getComputedStyle(e).transitionDuration),
+        .evaluate((node) => getComputedStyle(node).transitionDuration),
       "0s",
     );
-    await page.keyboard.press("Tab");
-    assert.equal(
-      await page.evaluate(() => document.activeElement.className),
-      "skip-link",
-    );
+    await page.locator(".skip-link").focus();
     await page.keyboard.press("Enter");
-    await page.waitForFunction(
-      () => document.activeElement.id === "stack-title",
-    );
-    report.live.push(
-      "Remembered theme, reduced motion and keyboard skip link exercised.",
-    );
-    await page.getByRole("tab", { name: "Apply", exact: true }).focus();
-    await page.keyboard.press("ArrowRight");
-    assert.equal(
-      await page
-        .getByRole("tab", { name: "Challenge", exact: true })
-        .getAttribute("aria-selected"),
-      "true",
-    );
-    await page.keyboard.press("Home");
-    assert.equal(
-      await page
-        .getByRole("tab", { name: "Apply", exact: true })
-        .getAttribute("aria-selected"),
-      "true",
-    );
-    report.live.push("Keyboard tab navigation passed.");
-    await page.route(
-      /https:\/\/(rpc\.sepolia\.ethpandaops\.io|sepolia\.rpc\.sentio\.xyz|ethereum-sepolia-rpc\.publicnode\.com)\/?$/,
-      (route) =>
-        route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            error: {
-              code: -32000,
-              message: "Read service unavailable for test",
-            },
-          }),
-        }),
-    );
-    await page.reload();
-    await page
-      .getByRole("button", { name: "Retry data", exact: true })
-      .first()
-      .waitFor();
-    assert.equal(
-      await page
-        .getByRole("button", { name: "Claim faucet", exact: true })
-        .isDisabled(),
-      true,
-    );
-    await page.unrouteAll();
-    await page
-      .getByRole("button", { name: "Retry data", exact: true })
-      .first()
-      .click();
-    await page.getByText(/Data at block/).waitFor({ timeout: 90000 });
-    report.live.push(
-      "Read-error state disables writes, and Retry recovers live data.",
-    );
-    assert.equal(report.errors.length, 0, report.errors.join("\n"));
+    await expect(page.locator("#page-heading")).toBeFocused();
+    note("Remembered theme, reduced motion and keyboard skip link passed.");
+    await formErrors(page, Wallet.createRandom().address);
     await context.close();
   }
-  if (fork && mode !== "live") {
-    // All writes below go to a local fork. No private key or live-chain signer.
+  if (mode === "edges") {
+    const context = await browser.newContext();
+    const page = await context.newPage(); observe(page);
+    await page.goto(base); await ready(page);
+    for (const width of [320, 390, 859, 860]) for (const theme of ["light", "dark"]) {
+      await page.setViewportSize({ width, height: 844 });
+      if (await page.locator("html").getAttribute("data-theme") !== theme) await page.locator(".theme-button").click();
+      for (const hash of ["#/apply", "#/docs/addresses", "#/stack", "#/"]) {
+        await navigate(page, hash);
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), width);
+        assert.equal(await page.locator(".desktop-nav").isVisible(), width >= 860);
+        assert.equal(await page.locator(".menu-button").isVisible(), width < 860);
+        const centers = await page.locator(".topbar-inner").evaluate((bar) => [...bar.children].filter((child) => getComputedStyle(child).display !== "none").map((child) => { const r = child.getBoundingClientRect(); return r.y + r.height / 2; }));
+        assert.ok(Math.max(...centers) - Math.min(...centers) < 2);
+        report.measurements.push({ width, theme, hash, overflow: false, oneRow: true });
+      }
+    }
+    for (const theme of ["light", "dark"]) {
+      if (await page.locator("html").getAttribute("data-theme") !== theme) await page.locator(".theme-button").click();
+      const pairs = await page.evaluate(() => {
+        const css = getComputedStyle(document.documentElement), body = getComputedStyle(document.body);
+        const tokens = Object.fromEntries(["paper", "ink", "dim", "ok", "alarm", "hover"].map((name) => [name, css.getPropertyValue(`--${name}`).trim()]));
+        const luminance = (hex) => {
+          const h = hex.slice(1); const expanded = h.length === 3 ? [...h].map((c) => c + c).join("") : h;
+          const v = [0, 2, 4].map((i) => parseInt(expanded.slice(i, i + 2), 16) / 255).map((v) => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4);
+          return .2126 * v[0] + .7152 * v[1] + .0722 * v[2];
+        };
+        return { bodyBackground: body.backgroundColor, tokens, pairs: ["paper", "hover"].flatMap((background) => ["ink", "dim", "ok", "alarm"].map((foreground) => { const a = luminance(tokens[foreground]), b = luminance(tokens[background]); return { foreground, background, ratio: Math.round((Math.max(a, b) + .05) / (Math.min(a, b) + .05) * 100) / 100 }; })) };
+      });
+      assert.ok(pairs.pairs.every((pair) => pair.ratio >= 4.5));
+      (report.contrast ??= []).push({ theme, ...pairs });
+    }
+    await page.route(rpcPattern, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jsonrpc: "2.0", id: 1, error: { code: -32000, message: "Read service unavailable for test" } }) }));
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Retry data", exact: true })).toBeVisible({ timeout: 60000 });
+    await page.unrouteAll();
+    await page.getByRole("button", { name: "Retry data", exact: true }).click();
+    await ready(page);
+    note("Boundary reflow at 320, 390, 859 and 860px in both themes; menu/desktop breakpoint and single-row bar passed. Rendered CSS contrast pairs all meet 4.5:1. Simulated read failure and Retry recovered live data.");
+    await context.close();
+  }
+  if (mode === "fork") {
+    const portServer = createServer();
+    await new Promise((done) => portServer.listen(0, "127.0.0.1", done));
+    const port = portServer.address().port;
+    await new Promise((done) => portServer.close(done));
+    fork = `http://127.0.0.1:${port}`;
+    anvil = spawn(
+      process.env.ANVIL_PATH || "/home/imd/.foundry/bin/anvil",
+      [
+        "--fork-url",
+        "https://rpc.sepolia.ethpandaops.io",
+        "--chain-id",
+        "11155111",
+        "--port",
+        String(port),
+        "--accounts",
+        "0",
+        "--silent",
+      ],
+      {
+        env: {
+          ...process.env,
+          XDG_CACHE_HOME: "/tmp/imd-acc-routes/foundry-cache",
+        },
+        stdio: ["ignore", "ignore", "pipe"],
+      },
+    );
+    anvil.stderr.on("data", (data) => process.stderr.write(data));
+    let started = false;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      try {
+        await rpc("eth_chainId");
+        started = true;
+        break;
+      } catch {
+        await new Promise((done) => setTimeout(done, 200));
+      }
+    }
+    assert.ok(started, "local Sepolia fork started");
     const tester = Wallet.createRandom().address;
     await rpc("anvil_impersonateAccount", [tester]);
     await rpc("anvil_setBalance", [tester, "0x56bc75e2d63100000"]);
-    const ctx = await browser.newContext({
+    const context = await browser.newContext({
       viewport: { width: 390, height: 900 },
     });
-    const p = await ctx.newPage();
-    p.on("pageerror", (e) => report.errors.push(e.message));
-    p.on("console", (e) => {
-      if (e.type() === "error") report.errors.push(e.text());
+    const page = await context.newPage();
+    observe(page);
+    await page.route(rpcPattern, async (route) => {
+      const response = await fetch(fork, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: route.request().postData(),
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: await response.text(),
+      });
     });
-    await p.route(
-      /https:\/\/(rpc\.sepolia\.ethpandaops\.io|sepolia\.rpc\.sentio\.xyz|ethereum-sepolia-rpc\.publicnode\.com)\/?$/,
-      async (route) => {
-        const request = route.request();
-        const response = await fetch(fork, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: request.postData(),
-        });
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: await response.text(),
-        });
-      },
-    );
-    await p.addInitScript(
-      ({ fork, tester }) => {
-        const listeners = new Map();
-        window.__walletControl = {
-          chain: "0x1",
-          rejectNext: false,
-          accounts: [tester],
-          calls: [],
-          estimates: [],
-          gasChecks: [],
-        };
-        const control = window.__walletControl;
-        const provider = {
-          request: async ({ method, params = [] }) => {
-            control.calls.push({ method, params });
-            if (method === "eth_accounts" || method === "eth_requestAccounts")
-              return control.accounts;
-            if (method === "eth_chainId") return control.chain;
-            if (method === "wallet_switchEthereumChain") {
-              control.chain = params[0].chainId;
-              for (const f of listeners.get("chainChanged") || [])
-                f(control.chain);
-              return null;
-            }
-            if (method === "eth_sendTransaction") {
-              const estimate = [...control.estimates]
-                .reverse()
-                .find((e) => e.data === params[0].data);
-              control.gasChecks.push(
-                !!estimate &&
-                  BigInt(params[0].gas) ===
-                    (BigInt(estimate.result) * 130n + 99n) / 100n,
-              );
-            }
-            if (method === "eth_sendTransaction" && control.rejectNext) {
-              control.rejectNext = false;
-              throw Object.assign(new Error("User rejected"), { code: 4001 });
-            }
-            const response = await fetch(fork, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({
-                jsonrpc: "2.0",
-                id: Date.now(),
-                method,
-                params,
-              }),
-            });
-            const body = await response.json();
-            if (body.error)
-              throw Object.assign(new Error(body.error.message), body.error);
-            if (method === "eth_estimateGas")
-              control.estimates.push({
-                data: params[0].data,
-                result: body.result,
-              });
-            return body.result;
-          },
-          on: (event, fn) => {
-            const list = listeners.get(event) || [];
-            listeners.set(event, [...list, fn]);
-          },
-          removeListener: (event, fn) =>
-            listeners.set(
-              event,
-              (listeners.get(event) || []).filter((f) => f !== fn),
-            ),
-        };
-        const announce = () => {
-          dispatchEvent(
-            new CustomEvent("eip6963:announceProvider", {
-              detail: {
-                info: {
-                  uuid: "fork-wallet",
-                  name: "Sepolia fork wallet",
-                  rdns: "test.local",
-                },
-                provider,
-              },
-            }),
-          );
-          dispatchEvent(
-            new CustomEvent("eip6963:announceProvider", {
-              detail: {
-                info: {
-                  uuid: "second-wallet",
-                  name: "Second test wallet",
-                  rdns: "test.second",
-                },
-                provider: { ...provider },
-              },
-            }),
-          );
-        };
-        addEventListener("eip6963:requestProvider", announce);
-        announce();
-      },
-      { fork, tester },
-    );
-    await p.goto(base);
-    await p
+    await injectForkWallet(page, fork, tester);
+    await page.goto(base + "#/stack");
+    await ready(page);
+    report.blocks.push(await page.locator(".data-line").innerText());
+    await page
       .getByRole("button", { name: "Connect wallet", exact: true })
       .click();
-    await p
-      .getByRole("button", { name: "Sepolia fork wallet", exact: true })
-      .waitFor();
-    await p.keyboard.press("Escape");
-    assert.equal(await p.locator("dialog").isVisible(), false);
-    await p
+    await expect(page.locator("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("dialog")).toBeHidden();
+    await expect(
+      page.getByRole("button", { name: "Connect wallet", exact: true }),
+    ).toBeFocused();
+    await page
       .getByRole("button", { name: "Connect wallet", exact: true })
       .click();
-    await p
+    await page
       .getByRole("button", { name: "Sepolia fork wallet", exact: true })
       .click();
-    await until(
-      p,
-      () => !document.querySelector("#tools button").disabled,
-      "EIP-6963 selection and Sepolia switch passed.",
+    await expect(
+      page.getByRole("button", { name: "Claim faucet", exact: true }),
+    ).toBeEnabled({ timeout: 60000 });
+    note(
+      "EIP-6963 choice, Escape/focus restoration and Sepolia switch passed.",
     );
-    await p.evaluate(() => {
+    await page.evaluate(() => {
       window.__walletControl.rejectNext = true;
     });
-    await p.getByRole("button", { name: "Claim faucet", exact: true }).click();
-    await p
-      .getByText("Request cancelled in your wallet. You can try again.", {
+    await page
+      .getByRole("button", { name: "Claim faucet", exact: true })
+      .click();
+    await expect(
+      page.getByText("Request cancelled in your wallet. You can try again.", {
         exact: true,
-      })
-      .waitFor();
-    report.fork.push("Rejected signature has a plain per-button error.");
-    await p.getByRole("button", { name: "Claim faucet", exact: true }).click();
-    await until(
-      p,
-      () =>
-        document
-          .querySelector("#tools")
-          .innerText.includes("Balance: 10,000.0000"),
-      "Faucet minted 10,000 and refreshed balance.",
-    );
-    await p.getByRole("button", { name: "Approve IMD", exact: true }).click();
-    await until(
-      p,
-      () => !document.querySelector('#tools button[type="submit"]').disabled,
-      "Exact stake approval enables credit.",
-    );
-    await p
+      }),
+    ).toBeVisible({ timeout: 30000 });
+    await page
+      .getByRole("button", { name: "Claim faucet", exact: true })
+      .click();
+    await expect(page.locator("#tools")).toContainText("Balance: 10,000.0000", {
+      timeout: 60000,
+    });
+    await page
+      .getByRole("button", { name: "Approve IMD", exact: true })
+      .click();
+    await expect(page.locator('#tools button[type="submit"]')).toBeEnabled({
+      timeout: 60000,
+    });
+    await page
       .getByRole("button", { name: "Stack to myself", exact: true })
       .click();
-    await until(
-      p,
-      () =>
-        document.querySelector("#stack").innerText.includes("1.0000") &&
-        document
-          .querySelector("#leaderboards")
-          .innerText.includes("Direct, no points"),
-      "Credit updates cashback, vault value, project split and recent stacks.",
+    await expect(page.locator("#stack")).toContainText("1.0000", {
+      timeout: 60000,
+    });
+    await navigate(page, "#/leaderboard");
+    await expect(page.locator("#leaderboards")).toContainText(
+      "Direct, no points",
     );
-    assert.match(await p.locator("#stack").innerText(), /Points\n0\.0000/);
-    assert.match(await p.locator("#leaderboards").innerText(), /No points yet/);
-    assert.ok(
-      await p.evaluate(() => window.__walletControl.gasChecks.every(Boolean)),
-      "every transaction uses its estimate multiplied by 1.3",
+    await expect(page.locator("#leaderboards")).toContainText("1.0000");
+    await navigate(page, "#/");
+    await expect(page.locator(".stack-summary")).toContainText(
+      "1.0000 IMD cashback",
     );
-    const projectName = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV";
-    await p.locator("#apply-project").fill(stacker);
-    await p.locator("#apply-name").fill(projectName);
-    await p
-      .locator("#apply-url")
-      .fill(`https://sepolia.etherscan.io/address/${stacker}`);
-    await p.locator("#apply-beneficiary").fill(tester);
-    await p
-      .getByRole("button", { name: "Copy question", exact: true })
-      .waitFor({ timeout: 30000 });
-    const expectedQuestion = registryInterface.decodeFunctionResult(
+    note(
+      "Faucet → exact approval → credit refreshed Stack, Home and Leaderboard; direct credits earn zero points.",
+    );
+    await formErrors(page, tester);
+    // Clear the remote EOA check before trying all empty fields on an enabled approval.
+    await page.locator("#apply-project").fill("");
+    await page.locator("#apply-beneficiary").fill("");
+    await page.locator("#apply-name").fill("");
+    await page.locator("#apply-url").fill("");
+    await page.locator("#apply-rate").fill("50");
+    await page
+      .getByRole("button", { name: "Get 10 test IMD", exact: true })
+      .click();
+    await expect(page.locator("#apply-panel")).toContainText(
+      "Balance: 10.0000",
+      { timeout: 60000 },
+    );
+    await page
+      .getByRole("button", { name: "Approve fee", exact: true })
+      .click();
+    await expect(page.locator("#apply-project")).toBeFocused();
+    for (const field of ["project", "name", "url", "beneficiary"])
+      await expect(page.locator(`#apply-${field}`)).toHaveAttribute(
+        "aria-invalid",
+        "true",
+      );
+    const name = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV";
+    const url = `https://sepolia.etherscan.io/address/${stacker}`;
+    await page.locator("#apply-project").fill(stacker);
+    await page.locator("#apply-name").fill(name);
+    await page.locator("#apply-url").fill(url);
+    await page.locator("#apply-beneficiary").fill(tester);
+    await expect(
+      page.getByRole("button", { name: "Copy question", exact: true }),
+    ).toBeVisible({ timeout: 60000 });
+    const exact = registryInterface.decodeFunctionResult(
       "applyQuestion",
       await rpc("eth_call", [
         {
           to: registry,
           data: registryInterface.encodeFunctionData("applyQuestion", [
             stacker,
-            projectName,
-            `https://sepolia.etherscan.io/address/${stacker}`,
+            name,
+            url,
             50,
             tester,
           ]),
@@ -473,174 +637,114 @@ try {
         "latest",
       ]),
     )[0];
-    assert.equal(
-      await p.locator("#apply-panel pre").innerText(),
-      expectedQuestion,
-    );
-    await p
-      .getByRole("button", { name: "Get 10 test IMD", exact: true })
+    assert.equal(await page.locator("#apply-panel pre").innerText(), exact);
+    await page
+      .getByRole("button", { name: "Approve fee", exact: true })
       .click();
-    await until(
-      p,
-      () =>
-        document
-          .querySelector("#apply-panel")
-          .innerText.includes("Balance: 10.0000"),
-      "Open mint supplies the separate oracle fee token.",
-    );
-    await p.getByRole("button", { name: "Approve fee", exact: true }).click();
-    await until(
-      p,
-      () =>
-        !document.querySelector('#apply-panel button[type="submit"]').disabled,
-      "Exact oracle fee approval enables application.",
-    );
-    await p
+    await expect(
+      page.getByRole("button", { name: "Apply for listing", exact: true }),
+    ).toBeEnabled({ timeout: 60000 });
+    await page
       .getByRole("button", { name: "Apply for listing", exact: true })
       .click();
-    await until(
-      p,
-      () =>
-        document
-          .querySelector("#questions")
-          .innerText.includes("ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV") &&
-        document.querySelector("#questions").innerText.includes("Application"),
-      "Application appears in open questions with project, asker and age.",
-    );
-    const checkQuestionWidth = async (state) => {
-      for (const width of [360, 390, 768, 1280])
-        for (const theme of ["light", "dark"]) {
-          await p.setViewportSize({ width, height: 800 });
-          if ((await p.locator("html").getAttribute("data-theme")) !== theme)
-            await p.locator(".theme-button").click();
-          await p.evaluate(() => document.fonts.ready);
-          const measurement = await p.evaluate((state) => {
-            const element = document.querySelector(
-              state === "open" ? ".question-row h3" : ".outcome-list .address a",
-            );
-            const range = document.createRange();
-            range.selectNodeContents(element);
-            return {
-              state,
-              width: innerWidth,
-              theme: document.documentElement.dataset.theme,
-              scroll: document.documentElement.scrollWidth,
-              name: element.textContent,
-              nameWidth: element.getBoundingClientRect().width,
-              nameScrollWidth: element.scrollWidth,
-              lines: range.getClientRects().length,
-              whiteSpace: getComputedStyle(element).whiteSpace,
-              overflowWrap: getComputedStyle(element).overflowWrap,
-              addressWhiteSpace: getComputedStyle(
-                document.querySelector("#contracts .address a"),
-              ).whiteSpace,
-            };
-          }, state);
-          report.measurements.push(measurement);
-          assert.equal(
-            measurement.scroll, width, `${state}: ${width}px ${theme} page overflow`,
-          );
-          assert.equal(
-            measurement.name, projectName, "the complete project name remains visible",
-          );
-          assert.ok(
-            measurement.nameScrollWidth <= Math.ceil(measurement.nameWidth),
-            "name stays within its box",
-          );
-          assert.equal(
-            measurement.addressWhiteSpace, "nowrap", "hex addresses retain compact formatting",
-          );
-          if (width <= 390)
-            assert.equal(measurement.lines, 2, "long names wrap into two lines on phones");
-          if (width === 360) {
-            await p.locator("#questions").scrollIntoViewIfNeeded();
-            await p.screenshot({
-              path: resolve(output, `questions-${state}-${width}-${theme}.png`),
-            });
-          }
-        }
-    };
-    await checkQuestionWidth("open");
-    await p.setViewportSize({ width: 390, height: 900 });
-    await p.screenshot({
-      path: resolve(output, "fork-application-390.png"),
-      type: "png",
-      fullPage: true,
+    await expect(page.locator("#questions")).toContainText(name, {
+      timeout: 60000,
     });
+    await expect(page.locator("#send-apply-disabled")).toContainText(
+      "This project already has an open question",
+    );
+    await expect(page.locator("#apply-project")).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+    await page.locator("#questions .project-link").click();
+    await expect(page.locator("#project-details")).toContainText(name);
+    await expect(page.locator("#project-history")).toContainText("Applied");
+    await expect(page.locator("#project-history time")).toBeVisible();
+    await expect(page.locator("#project-question")).toContainText(
+      "Application",
+    );
+    note(
+      "Oracle token mint, exact fee approval and application passed; exact panel question, Apply open question, project history/date and disabled open-question reason verified.",
+    );
+    await navigate(page, "#/projects");
+    await page.getByRole("button", { name: "Applied", exact: true }).click();
+    await expect(page.locator(".project-table")).toContainText(name);
+    await page.getByRole("button", { name: "Listed", exact: true }).click();
+    await expect(
+      page.getByText("No listed projects.", { exact: false }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Delisted", exact: true }).click();
+    await expect(
+      page.getByText("No delisted projects.", { exact: false }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "All", exact: true }).click();
+    await page.locator(".project-table .project-link").click();
+    await expect(page.locator("#project-details")).toContainText(name);
+    note(
+      "Project filters and linked rows passed with a populated application.",
+    );
+    await matrix(page, "fork", [
+      "#/",
+      "#/stack",
+      "#/projects",
+      `#/projects/${stacker}`,
+      "#/apply",
+      "#/leaderboard",
+    ]);
     await rpc("evm_increaseTime", [86401]);
     await rpc("evm_mine");
-    await until(
-      p,
-      () => !document.querySelector("#questions article button").disabled,
-      "The 15-second poll enables expiry after the live contract threshold, without a manual refresh.",
+    await navigate(page, `#/projects/${stacker}`);
+    await page.getByRole("button", { name: "Refresh", exact: true }).click();
+    await expect(
+      page.getByRole("button", { name: "Expire", exact: true }),
+    ).toBeEnabled({ timeout: 60000 });
+    await page.getByRole("button", { name: "Expire", exact: true }).click();
+    await expect(page.locator("#project-question")).toContainText(
+      "no open question",
+      { timeout: 60000 },
     );
-    await p.getByRole("button", { name: "Expire", exact: true }).click();
-    await until(
-      p,
-      () =>
-        document
-          .querySelector("#questions")
-          .innerText.includes("Question cleared without a decision"),
-      "Expire clears the question and shows its outcome.",
+    await expect(page.locator("#project-history")).toContainText("AskCleared");
+    await navigate(page, "#/apply");
+    await expect(page.locator("#outcomes")).toContainText(
+      "Question cleared without a decision",
     );
-    await checkQuestionWidth("outcome");
-    for (const width of [360, 768, 1280])
-      for (const theme of ["light", "dark"]) {
-        await p.setViewportSize({ width, height: 900 });
-        if ((await p.locator("html").getAttribute("data-theme")) !== theme)
-          await p.locator(".theme-button").click();
-        assert.equal(
-          await p.evaluate(() => document.documentElement.scrollWidth),
-          width,
-          "populated app has no page overflow",
-        );
-        console.log(`Auditing populated app: ${width}px ${theme}`);
-        const axe = await new AxeBuilder({ page: p })
-          .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
-          .analyze();
-        assert.equal(
-          axe.violations.length,
-          0,
-          JSON.stringify(
-            axe.violations.map((v) => ({
-              id: v.id,
-              nodes: v.nodes.map((n) => n.target),
-            })),
-          ),
-        );
-        report.accessibility.push({
-          width,
-          theme,
-          route: "#/ (populated local fork)",
-          violations: [],
-        });
-        await p.locator("#stack").screenshot({
-          path: resolve(output, `stack-${width}-${theme}.png`),
-          type: "png",
-        });
-        console.log(`Populated app checked: ${width}px ${theme}`);
-      }
-    report.fork.push(
-      "Populated tables and wallet balances pass overflow and accessibility checks at 360, 768 and 1280 in both themes.",
-    );
-    report.fork.push(
-      "No live-chain writes were sent. Fork application uses an existing non-trading contract to exercise contract prechecks only.",
-    );
+    const gas = await page.evaluate(() => window.__walletControl.gasChecks);
     assert.ok(
-      await p.evaluate(() => window.__walletControl.gasChecks.every(Boolean)),
-      "all wallet gas limits equal estimate times 1.3",
+      gas.length >= 7 && gas.every(Boolean),
+      "all transaction limits are estimate ×1.3 rounded up",
     );
-    report.fork.push(
-      "All transaction gas limits equal the captured estimate multiplied by 1.3, rounded up.",
+    note(
+      `Expiry and refreshed outcome passed. All ${gas.length} wallet gas-limit checks equal estimate ×1.3, rounded up.`,
     );
-    await ctx.close();
+    await context.close();
   }
-  assert.equal(report.errors.length, 0, report.errors.join("\n"));
-  console.log(JSON.stringify(report, null, 2));
+  if (mode === "fixtures")
+    await checkRegistryFixtures({
+      browser,
+      base,
+      registry,
+      stacker,
+      registryInterface,
+      rpcPattern,
+      report,
+      note,
+      matrix,
+    });
+  assert.deepEqual(report.errors, []);
+  assert.deepEqual(report.resourceFailures, []);
+  note(
+    "No page exceptions, console errors or failed resources in the completed run.",
+  );
+} catch (error) {
+  report.failure = String(error.stack || error);
+  throw error;
 } finally {
   await writeFile(
-    resolve(output, "results.json"),
+    resolve(output, `${mode}-results.json`),
     JSON.stringify(report, null, 2) + "\n",
   );
   await browser.close();
+  await new Promise((done) => server.close(done));
+  if (anvil) anvil.kill("SIGTERM");
 }

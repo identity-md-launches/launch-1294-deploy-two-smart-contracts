@@ -9,8 +9,10 @@ screen identifies the product and offers wallet connection. Connected
 balances belong inside the stack section, with figures capped at 18px.
 
 The source of truth is `site/src/style.css`, with shared components in
-`site/src/ui.tsx`, the app in `site/src/App.tsx`, listing forms in
-`site/src/forms.tsx`, and documentation in `site/src/Docs.tsx`.
+`site/src/ui.tsx`, the shared wallet/data shell in `site/src/App.tsx`, the navigation in
+`site/src/Header.tsx`, routes in `site/src/routes.ts`, page content in
+`site/src/pages.tsx`, forms in `site/src/forms.tsx`, and individual docs
+sections in `site/src/Docs.tsx`.
 
 ## Colors
 
@@ -70,11 +72,10 @@ are uppercase with `.06em` tracking. Text paragraphs, docs content and code
 have a maximum measure of 75ch. Code wraps, including long addresses.
 Headings balance their lines. There are no text labels above headings.
 
-Open-question project headings and recent-outcome project links use
-`overflow-wrap: anywhere`. Outcome links and their `.address` wrappers
-allow normal whitespace, so an unbroken 48-character name stays visible
-and the row grows naturally. Hexadecimal address displays retain their
-compact nonwrapping format elsewhere.
+Project headings and `ProjectLink` links use `overflow-wrap: anywhere`,
+including open questions and recent outcomes. Long names remain complete
+and their rows grow naturally. The hexadecimal explorer displays in
+`Address` keep their compact nonwrapping format and full accessible value.
 
 Numbers use tabular figures. Amounts display four decimal places using
 integer token arithmetic, with truncation for display. Numeric table
@@ -90,28 +91,38 @@ below 480px. Main gaps are 20px, reduced to 16px at that breakpoint.
 Form label/control gaps are 6px; fields have 16px group spacing. Subheadings
 have 24px above and 8px below.
 
-The app DOM order is stack, projects, apply/challenge plus questions,
-leaderboards, test tools, contracts. At 860px, CSS places Test tools beside
-Your stack and the listing form beside Open questions. Frames align at the
-top and keep their natural height. Leaderboards use two columns there too.
-Below 860px, everything follows the single-column DOM order.
+Each app route is one column of naturally sized sections. Home contains a
+short explanation, three facts, a Connect action or stack summary, the vault
+status and last five stacks. Stack contains the complete balances and
+per-project table, followed by Test tools. Apply contains the form, then
+Open questions, then Recent outcomes. Project pages contain the project
+state and periods, dated registry history, its open question and its
+Challenge form when listed. Leaderboard tables stack vertically even on
+desktop, so unequal row counts cannot leave a tall gap beside a short table.
+Only the compact stack figures use two columns; there are no two-column
+pairs of content boxes.
 
-The top bar is sticky, with a 64px control row on desktop and a 54px row
-below 600px. Below 600px the Sepolia text disappears, navigation text is
-13px and controls are 32px. At 360px the brand, App, Docs, theme icon and
-Connect stay on one row. Wallet messages live below the sticky bar so they
-do not enlarge it. An extra compact address-button rule handles widths
-below 360px while preserving the 16px gutter.
+The sticky top bar remains a single control row: 64px from 600px, 54px
+below. From **860px**, Home, Stack, Projects, Apply, Leaderboard and Docs
+appear inline with the brand, theme toggle and Connect. Below 860px they
+become a Menu button opening a vertical link list below the row. Escape
+and outside click close it and return focus to Menu. Enter/Space toggle it;
+Tab reaches the native links. Current page links have both an underline
+and `aria-current="page"`; a project detail marks Projects and every docs
+section marks Docs. Wallet messages stay below the bar.
 
-Docs use a 190px contents column and 40px gap from 860px; that contents
-column sticks at 88px. Below 860px, contents sits above the text and its
-links wrap naturally. Hash links scroll/focus the selected section with
-space for the sticky header.
+Docs use the existing 190px contents column and 40px gap from 860px;
+contents sticks at 88px. Below 860px a labeled native select replaces it
+above the text. Only the selected section renders. Previous and next links
+sit below it. Hash routes scroll to the top, update the document title and
+focus the page h1. Browser back/forward uses the same behavior. Unknown
+routes show a short explanation and a Home link.
 
 Wide tables scroll inside focusable `.table-scroll` regions. Project and
 recent-stack tables have minimum widths of 880px and 640px. The page itself
-must not scroll horizontally. The build was inspected at 360, 390, 768 and
-1280px; further reflow coverage and limits are in the validation record.
+must not scroll horizontally. The final export was checked at 360, 768 and 1280px in both themes, plus
+targeted 320/390/859/860px reflow checks. Results and limits are in the
+validation record.
 
 ## Elevation and depth
 
@@ -139,14 +150,24 @@ card grids. The small theme icon is a currentColor SVG with 1.5px strokes.
   13px inline padding. `.small` is 32px, `.primary` is ink-filled with paper
   text. Hover, focus, disabled, pending, success and error states remain
   readable. A 2px ink focus outline has a 4px offset.
-- `ListingForms` uses keyboard-accessible Apply/Challenge tabs with arrow,
-  Home and End keys. Forms have explicit labels, hints, inline errors,
-  focus on the first invalid field, live fee quotes and separate actions.
-  The numbered Apply list is the only UI step numbering.
+- `ApplyForm` and `ChallengeForm` (`forms.tsx`) render on their respective
+  routes. `ApplyForm` keeps the three numbered token/approval/send steps
+  and the exact panel question. `ChallengeForm` pins the project and shown
+  beneficiary in read-only fields, with fee plus bond and a reason field.
+  Errors appear after blur or an attempted action, use `--alarm`, and are
+  linked with `aria-invalid` and `aria-describedby`. Length and character
+  errors name the actual problem. Code/registry failures attach to the
+  project field; cooldown errors include an opening date. Disabled actions
+  have a reason immediately below them. The first invalid field receives
+  focus after an attempted action. The Apply list is the only numbered
+  visual step sequence.
 - `TxStatus` is a persistent polite live region beside the action. Pending
   labels explain whether the app is checking, awaiting the wallet or
   waiting for confirmation. Success and pending-after-send states link to
   the transaction. Errors explain cancellation or contract constraints.
+- `ProjectLink` supplies a native internal link to a project page. Project
+  names wrap anywhere; the whole name remains available. Table rows also
+  navigate when clicked outside their independent explorer links.
 - `Address` supplies an explorer link with the full accessible address.
   `Copy` copies the full value and changes its visible and accessible label
   on success or failure. `CodeBlock` gives every code sample a copy button.
@@ -171,10 +192,18 @@ Do not add a hero, oversized figures, extra card layers, ornamental badges,
 new font families, gradients or decorative motion. Do not use faint or line
 colors for content. Keep the full address available when shortening it.
 
-For a new page, keep the shared Header, add a hash route, place content in
-`.container`, reuse the heading hierarchy, and check both themes and the
-360px layout before exporting. The source must stay aligned with the
-committed `dist/` output.
-
 The review method and retained licenses are described in
 `site/THIRD-PARTY-NOTICES.md` and `site/DESIGN-LICENSE`.
+
+Adding a route: declare it in `routes.ts`, render its content inside the
+existing `App` main, reuse `Frame`/`Table`, and keep all wallet and log loading
+in the shared shell. Never mount a second wallet hook or data loader inside
+a page. New chain-data pages need the shared block/Refresh line. Event dates
+are fetched with the snapshot and cached; opening a project page does not
+rescan logs. Keep source and export in step with the production build.
+
+The compact scale, 14px inputs and theme behavior are deliberately retained
+from the supplied site. Impeccable's mobile type-hierarchy advisory conflicts
+with the requested exact type sizes and remains documented in the review;
+no detector suppression or alternate font scale was added. Native iOS input
+zoom, screen readers and physical-device behavior were not verified.

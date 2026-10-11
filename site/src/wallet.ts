@@ -101,7 +101,7 @@ export function explainError(error: unknown): string {
   if (/user rejected|user denied/i.test(message))
     return "Request cancelled in your wallet. You can try again.";
   if (/paused/i.test(message)) return errorMessages.EnforcedPause;
-  if (/faucet|cooldown|too soon/i.test(message))
+  if (/faucet/i.test(message))
     return "The faucet is not ready. Check the next allowed time and refresh.";
   if (/insufficient funds/i.test(message))
     return "You need Sepolia ETH to pay for gas.";

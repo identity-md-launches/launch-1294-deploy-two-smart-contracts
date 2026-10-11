@@ -1,51 +1,64 @@
 import type { Snapshot } from "./chain";
-import { ContractAddresses } from "./App";
+import { ContractAddresses } from "./pages";
 import { CodeBlock, DataMessage, Table } from "./ui";
 import { duration, units } from "./model";
 import { integrationCode } from "./integration";
 import agentGuide from "../public/llms.txt?raw";
 
-const contents = [
-  ["what-it-is", "What it is"],
-  ["how-it-works", "How it works"],
-  ["addresses", "Addresses"],
-  ["integrate", "Integrate a project"],
-  ["get-listed", "Get listed"],
-  ["points", "Points"],
-  ["for-agents", "For agents"],
-];
+import { docsSections, type DocSection } from "./routes";
+
 export function Docs({
+  section,
   data,
   error,
   loading,
   refresh,
 }: {
+  section: DocSection;
   data?: Snapshot;
   error: string;
   loading: boolean;
   refresh: () => Promise<void>;
 }) {
+  const index = docsSections.findIndex(([slug]) => slug === section);
+  const previous = docsSections[index - 1],
+    next = docsSections[index + 1];
   return (
-    <main className="container" id="docs-main">
-      <div className="page-heading">
-        <h1 id="docs-heading" tabIndex={-1}>
-          Documentation
-        </h1>
-        <p>Using and integrating imd/acc on Sepolia.</p>
+    <div className="docs-layout">
+      <nav className="contents" aria-label="Docs sections">
+        <h2>Contents</h2>
+        <ul>
+          {docsSections.map(([id, title]) => (
+            <li key={id}>
+              <a
+                href={`#/docs/${id}`}
+                aria-current={section === id ? "page" : undefined}
+              >
+                {title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div className="docs-select field">
+        <label htmlFor="docs-section">Docs section</label>
+        <select
+          id="docs-section"
+          value={section}
+          onChange={(event) => {
+            location.hash = `#/docs/${event.target.value}`;
+          }}
+        >
+          {docsSections.map(([id, title]) => (
+            <option key={id} value={id}>
+              {title}
+            </option>
+          ))}
+        </select>
       </div>
-      <div className="docs-layout">
-        <nav className="contents" aria-label="Contents">
-          <h2>Contents</h2>
-          <ul>
-            {contents.map(([id, title]) => (
-              <li key={id}>
-                <a href={`#/docs/${id}`}>{title}</a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="docs-content">
-          <section id="what-it-is" tabIndex={-1}>
+      <div className="docs-content">
+        {section === "what" && (
+          <section id="docs-what">
             <h2>What it is</h2>
             <p>
               imd/acc pays trading cashback as staked IMD. A participating
@@ -63,7 +76,9 @@ export function Docs({
               payment token.
             </p>
           </section>
-          <section id="how-it-works" tabIndex={-1}>
+        )}
+        {section === "how" && (
+          <section id="docs-how">
             <h2>How it works</h2>
             <p className="flow">
               Trade → credit → vault deposit → Stacked → points
@@ -99,7 +114,9 @@ export function Docs({
               have a one-block hold before redemption.
             </p>
           </section>
-          <section id="addresses" tabIndex={-1}>
+        )}
+        {section === "addresses" && (
+          <section id="docs-addresses">
             <h2>Addresses</h2>
             <p className="secondary">
               Sepolia, chain 11155111. Scan Stacker and ProjectRegistry events
@@ -111,7 +128,9 @@ export function Docs({
               assets, including staked IMD.
             </p>
           </section>
-          <section id="integrate" tabIndex={-1}>
+        )}
+        {section === "integrate" && (
+          <section id="docs-integrate">
             <h2>Integrate a project</h2>
             <p>The README’s integration example:</p>
             <CodeBlock code={integrationCode} />
@@ -184,7 +203,9 @@ export function Docs({
               Measure your complete integration, including the first credit.
             </p>
           </section>
-          <section id="get-listed" tabIndex={-1}>
+        )}
+        {section === "listing" && (
+          <section id="docs-listing">
             <h2>Get listed</h2>
             <p>
               Integrate the Stacker and verify your trading contract’s source on
@@ -321,10 +342,13 @@ export function Docs({
               challenge returns its bond.
             </p>
             <p>
-              <a href="#/">Open the app to apply or challenge ↗</a>
+              <a href="#/apply">Apply for a listing</a> or{" "}
+              <a href="#/projects">choose a project to challenge</a>.
             </p>
           </section>
-          <section id="points" tabIndex={-1}>
+        )}
+        {section === "points" && (
+          <section id="docs-points">
             <h2>Points</h2>
             <p>
               One IMD stacked for a trader earns one point when the project is
@@ -353,7 +377,9 @@ export function Docs({
               Points may form the basis of a later airdrop. Nothing is promised.
             </p>
           </section>
-          <section id="for-agents" tabIndex={-1}>
+        )}
+        {section === "agents" && (
+          <section id="docs-agents">
             <h2>For agents</h2>
             <p>
               Copy the integration context below for an agent writing a trading
@@ -362,8 +388,20 @@ export function Docs({
             </p>
             <CodeBlock code={agentGuide} label="Copy agent guide" />
           </section>
-        </div>
+        )}
+        <nav className="docs-pagination" aria-label="Docs pages">
+          {previous && (
+            <a rel="prev" href={`#/docs/${previous[0]}`}>
+              ← Previous: {previous[1]}
+            </a>
+          )}
+          {next && (
+            <a rel="next" href={`#/docs/${next[0]}`}>
+              Next: {next[1]} →
+            </a>
+          )}
+        </nav>
       </div>
-    </main>
+    </div>
   );
 }

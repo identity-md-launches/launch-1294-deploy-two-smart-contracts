@@ -14,6 +14,7 @@ import {
   type Application,
   type ChainEvent,
   type Project,
+  address,
   applicationArgs,
   applicationErrors,
   checkedText,
@@ -231,6 +232,7 @@ export class DataLoader {
     hash: string;
     stacks: RawLog[];
     registry: RawLog[];
+    eventDates: Map<number, number>;
   };
   constructor(private client = rpc) {}
   async load(account?: string) {
@@ -297,6 +299,27 @@ export class DataLoader {
     ];
     const events = decodeLogs(registry, REGISTRY),
       summary = summarize(decodeLogs(stacks, STACKER), events);
+    const eventDates = new Map(
+      [...(cache?.eventDates ?? [])].filter(([height]) => height < from),
+    );
+    const missingDates = [
+      ...new Set(events.map((event) => event.block)),
+    ].filter((height) => !eventDates.has(height));
+    for (let i = 0; i < missingDates.length; i += 6) {
+      await Promise.all(
+        missingDates.slice(i, i + 6).map(async (height) => {
+          const eventBlock =
+            height === block
+              ? head
+              : await c.request("eth_getBlockByNumber", [hex(height), false]);
+          if (!eventBlock)
+            throw new Error(
+              "A registry event date is unavailable. Refresh to retry.",
+            );
+          eventDates.set(height, Number(BigInt(eventBlock.timestamp)));
+        }),
+      );
+    }
     const projects: ProjectView[] = [];
     // Bound concurrency as the registry grows, to avoid flooding public RPCs.
     const entries = [...summary.projects.values()];
@@ -370,13 +393,14 @@ export class DataLoader {
       throw new Error(
         "The chain changed during this refresh. Retry for a consistent block.",
       );
-    this.cache = { block, hash: head.hash, stacks, registry };
+    this.cache = { block, hash: head.hash, stacks, registry, eventDates };
     return {
       block,
       timestamp,
       readAt: Date.now(),
       summary,
       events,
+      eventDates,
       projects,
       fee: fee as bigint,
       bond: bond as bigint,
@@ -390,25 +414,55 @@ export class DataLoader {
     };
   }
 }
+export class FormFieldError extends Error {
+  constructor(
+    public field: "project" | "reason" | "beneficiary",
+    message: string,
+  ) {
+    super(message);
+  }
+}
+export async function checkProject(value: string, client = rpc) {
+  let project: string;
+  try {
+    project = address(value);
+  } catch (error) {
+    throw new FormFieldError("project", (error as Error).message);
+  }
+  const [code, state] = await Promise.all([
+    client.request<string>("eth_getCode", [project, "latest"]),
+    client.read(A.ProjectRegistry, REGISTRY, "projectOf", [project]),
+  ]);
+  if (code === "0x")
+    throw new FormFieldError(
+      "project",
+      "Project has no contract code. Enter the trading contract address.",
+    );
+  return state as ProjectState;
+}
+export async function checkApplicationProject(project: string, client = rpc) {
+  const state = await checkProject(project, client);
+  if (state.ask !== 0n)
+    throw new FormFieldError(
+      "project",
+      "This project already has an open question. Wait for its outcome.",
+    );
+  if (state.listed)
+    throw new FormFieldError(
+      "project",
+      "Already listed. Open its project page to review or challenge the listing.",
+    );
+}
 export async function checkApplication(form: Application, client = rpc) {
   const errors = applicationErrors(form);
   if (Object.keys(errors).length) throw new Error(Object.values(errors)[0]);
-  const args = applicationArgs(form);
-  const [code, state, question] = await Promise.all([
-    client.request<string>("eth_getCode", [args[0], "latest"]),
-    client.read(A.ProjectRegistry, REGISTRY, "projectOf", [args[0]]),
-    client.read(A.ProjectRegistry, REGISTRY, "applyQuestion", args),
-  ]);
-  if (code === "0x")
-    throw new Error(
-      "Project has no contract code. Enter the trading contract address.",
-    );
-  if (state.ask !== 0n)
-    throw new Error(
-      "This project already has an open question. Wait for its outcome.",
-    );
-  if (state.listed) throw new Error("This project is already listed.");
-  return question as string;
+  await checkApplicationProject(form.project, client);
+  return (await client.read(
+    A.ProjectRegistry,
+    REGISTRY,
+    "applyQuestion",
+    applicationArgs(form),
+  )) as string;
 }
 export async function checkChallenge(
   project: string,
@@ -417,22 +471,39 @@ export async function checkChallenge(
   fee: bigint,
   client = rpc,
 ) {
-  checkedText(reason, 1, 280, "Reason");
+  try {
+    checkedText(reason, 1, 280, "Reason");
+  } catch (error) {
+    throw new FormFieldError("reason", (error as Error).message);
+  }
+  try {
+    address(beneficiary);
+  } catch (error) {
+    throw new FormFieldError("beneficiary", (error as Error).message);
+  }
   const [state, liveFee, head] = await Promise.all([
     client.read(A.ProjectRegistry, REGISTRY, "projectOf", [project]),
     client.read(A.ProjectRegistry, REGISTRY, "ORACLE_FEE"),
     client.request("eth_getBlockByNumber", ["latest", false]),
   ]);
   if (!state.listed)
-    throw new Error(
+    throw new FormFieldError(
+      "project",
       "This project is no longer listed. Refresh to see its outcome.",
     );
   if (state.ask !== 0n)
-    throw new Error("This project already has an open question.");
+    throw new FormFieldError(
+      "project",
+      "This project already has an open question.",
+    );
   if (BigInt(head.timestamp) < state.challengeOpenAt)
-    throw new Error("The listing cooldown has not ended.");
+    throw new FormFieldError(
+      "project",
+      `The listing cooldown has not ended. Challenge opens ${new Date(Number(state.challengeOpenAt) * 1000).toLocaleString()}.`,
+    );
   if (key(state.beneficiary) !== key(beneficiary))
-    throw new Error(
+    throw new FormFieldError(
+      "beneficiary",
       "The beneficiary changed. Refresh and review it before challenging.",
     );
   if (liveFee === 0n || liveFee !== fee)

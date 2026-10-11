@@ -1,36 +1,47 @@
 {
+  "checkedAt": "2026-10-11",
+  "exportBytes": 664577,
   "limitBytes": 8388608,
-  "candidateBytes": 4202036,
-  "existingGitPackKiB": 2149,
-  "conservativeBytesIncludingExistingPacks": 6402612,
-  "productionExportBytes": 651156,
-  "candidateFileCount": 191,
-  "noDependencyOrCacheDirectories": true,
-  "noDependencyArchives": true,
-  "ignoreFilesChanged": false,
-  "contractsOrExistingBuildConfigurationChanged": false,
-  "submodules": 0,
-  "requiredResponseIncludedInByteCount": true,
-  "export": [
+  "submittedFileBytesExcludingThisAudit": 4873123,
+  "existingGitPackSizeKiB": 2093,
+  "conservativeFullBundleBoundBytes": 7116355,
+  "boundMethod": "All current submission file contents uncompressed, plus existing Git pack size, plus 100,000 bytes for this audit and Git metadata/pack overhead. Includes old content twice, so deliberately conservative. Original .git was not modified to create a bundle.",
+  "runtimeSourceMatchesBuildWorkspace": true,
+  "exportMatchesBuiltOutput": true,
+  "llmsTxtMatchesPriorExport": true,
+  "relativeAssetsResolve": true,
+  "requiredMetadataPresent": [
+    "title",
+    "favicon",
+    "description",
+    "og:title",
+    "og:image"
+  ],
+  "protectedPathsUnchanged": true,
+  "ignoreFilesUnchanged": true,
+  "submodules": [],
+  "dependencyOrCacheDirectoriesInSubmission": [],
+  "unnecessaryDependencyArchives": [],
+  "files": [
     {
       "path": "dist/THIRD-PARTY-NOTICES.txt",
       "bytes": 3281,
       "sha256": "eaba3d60f880d42f4cd534c741cb22ad324227d6b1594246949c04eafa3490db"
     },
     {
-      "path": "dist/assets/ethers-CeQebH77.js",
-      "bytes": 261457,
-      "sha256": "ba3c8131d9f9ab23ebb1a90496790f739443fca92a2856173e2d0f12a95d54c0"
+      "path": "dist/assets/ethers-2-f0GYWs.js",
+      "bytes": 261515,
+      "sha256": "9722ff7be9bfe961f07303dc96eb7c3d1ced8be32ca1c2081de46281e3ef4061"
     },
     {
-      "path": "dist/assets/index-DLHKj_H7.css",
-      "bytes": 11951,
-      "sha256": "69fbd7c043c1eeb1b0dcaf972a34a8ad9532e4b25b4fc25c8e516d195418a7d7"
+      "path": "dist/assets/index-CUTN8yOB.css",
+      "bytes": 13214,
+      "sha256": "4ae067be52ce77b2042cdbbae3b2d3ad87191e1528d8afd14e3bbae6c6b4c5a7"
     },
     {
-      "path": "dist/assets/index-DUU543FI.js",
-      "bytes": 271646,
-      "sha256": "92bb61b96006ff3dfc79cb041915f756cdfa1a2d1180c23a33fab35f74859327"
+      "path": "dist/assets/index-zwBhtgiT.js",
+      "bytes": 283746,
+      "sha256": "fff1e20e6e6dfb66fc09253a4a74d8cd06047ede1bef5a74393e188454baf09d"
     },
     {
       "path": "dist/assets/react-DS5UYnvf.js",
@@ -65,7 +76,7 @@
     {
       "path": "dist/index.html",
       "bytes": 2079,
-      "sha256": "acdab0d322e456e051d1d153255158661733c075d17e9ecde63aa8c795fdd1be"
+      "sha256": "b4e4997053785bf16794252c8079a2308e3e4aa97be023ea69792b791c50cc91"
     },
     {
       "path": "dist/llms.txt",
@@ -76,6 +87,101 @@
       "path": "dist/og.png",
       "bytes": 29804,
       "sha256": "f14ef524a214affc7a62715ad5f3f6f9f868dc51ec636bee91343b296548d64c"
+    },
+    {
+      "path": "site/package-lock.json",
+      "bytes": 72237,
+      "sha256": "29e207ad32a081fe6bc5d2363e16cf3e7aa413fb6beeae1053d1deac00309de0"
+    },
+    {
+      "path": "site/package.json",
+      "bytes": 870,
+      "sha256": "688d3d58eec2bb90aa414b6ace08da194e8618a739b661f14e146f78e71f1bb1"
+    },
+    {
+      "path": "site/src/App.tsx",
+      "bytes": 11763,
+      "sha256": "17a89a8b17e5778685cc637141b8d03ca95adacc76cc72e4918bc4a1108a5f9b"
+    },
+    {
+      "path": "site/src/Docs.tsx",
+      "bytes": 16065,
+      "sha256": "6ac50983daf0089e7cb247b97f2dcd91b7e251f9e86f2f0645f6769a0d43c5df"
+    },
+    {
+      "path": "site/src/Header.tsx",
+      "bytes": 5098,
+      "sha256": "3a47562dd87898bdcba09946c05b142dd515cae572d00056092bcabeff642216"
+    },
+    {
+      "path": "site/src/abi/ProjectRegistry.json",
+      "bytes": 28066,
+      "sha256": "a938cbf5ae65f42dcb0536412b0e8ec0853ce23ad1a01433579450bf229b0260"
+    },
+    {
+      "path": "site/src/abi/Stacker.json",
+      "bytes": 3465,
+      "sha256": "92cbb183f935d9134a4e5caaec8c3237203e1f1badac52728f57d9c1d6c05cd3"
+    },
+    {
+      "path": "site/src/chain.ts",
+      "bytes": 15751,
+      "sha256": "4b2c6e0aba7cec663b68b1823ebb26c256b347950a07260a159e807d2e9da11d"
+    },
+    {
+      "path": "site/src/config.ts",
+      "bytes": 2006,
+      "sha256": "c9a1bab8cdd71bb377a96d2ef45f30db040fbaf6cce9090a7403e8830dc46e68"
+    },
+    {
+      "path": "site/src/deployment.json",
+      "bytes": 909,
+      "sha256": "b2a3e5ce6baadac22f14a80cce246cb146000d3dd47b632a91409cf7ad89293e"
+    },
+    {
+      "path": "site/src/forms.tsx",
+      "bytes": 22528,
+      "sha256": "a9e1bb2fb8f865d981615333de24d811aaaf45e923da8b29e8f1488d88257937"
+    },
+    {
+      "path": "site/src/integration.ts",
+      "bytes": 519,
+      "sha256": "3286031b2f42ecc16cb77ca96b14fa8252a4d6abc77c8cf100edd897d4fce1e5"
+    },
+    {
+      "path": "site/src/main.tsx",
+      "bytes": 161,
+      "sha256": "d5d8c1b3efe8fc2a8de32a2f24dea77197d2a2a6cccd7738c5d05c445ff1713c"
+    },
+    {
+      "path": "site/src/model.ts",
+      "bytes": 7402,
+      "sha256": "60b2b742ee99e36cda58332f3eef42d294e83fffad2e694bb36dcf6921c2e512"
+    },
+    {
+      "path": "site/src/pages.tsx",
+      "bytes": 25690,
+      "sha256": "d4b4e72d79bc00a8d269633d0016b00cd849e38791219e68f569a36d12901249"
+    },
+    {
+      "path": "site/src/routes.ts",
+      "bytes": 2004,
+      "sha256": "db7e296c40a0cc6826a6800a76f1a68b03b16013ba8251e093d2c7a7296720a9"
+    },
+    {
+      "path": "site/src/style.css",
+      "bytes": 16747,
+      "sha256": "3e9097cd7d05d973bf5fef129f7470ec08a79c3d7f57a53173bdfe1e4b1c527c"
+    },
+    {
+      "path": "site/src/ui.tsx",
+      "bytes": 4223,
+      "sha256": "912b1081e60a14bc5afe19af9deb086ddc7f95d8b2a95b53f0d367440cfcc67b"
+    },
+    {
+      "path": "site/src/wallet.ts",
+      "bytes": 12500,
+      "sha256": "798f0c7cd632ba69d1dc24c3dd2db19da2edcd1aa7c03cf511c686b9a192a07a"
     }
   ]
 }

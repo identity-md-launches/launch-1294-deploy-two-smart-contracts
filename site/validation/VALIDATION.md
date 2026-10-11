@@ -1,272 +1,226 @@
-# Sepolia test run 2 website validation
+# Routed Sepolia website validation
 
-Worker-run checks on 2026-10-11. These results document observations and
-limitations; they are not independent certification. No live-chain
-transaction was sent, and no contract source, deployment, Solidity build
-configuration or existing dependency was changed.
+Worker checks on **2026-10-11**, for the current routed site in `dist/`.
+These are recorded observations, not independent certification. This job
+changed no contract source or deployment, sent no transaction to live
+Sepolia, and left existing build configuration and dependencies unchanged.
+Previous screenshots/reports in `browser/`, `overflow/` and the older
+root-level detector JSON files describe earlier revisions. Current evidence
+is in [`routes/`](routes/) and [`bundle-audit.json`](bundle-audit.json).
 
-## Revision: long project names
+## Delivered behavior
 
-Finding `2eea5bd6793f75042630339a806a12a7707d15764829f6cbe4ae83e280162767`
-was reproduced before editing, then fixed. This section records the new
-checks; the original implementation record below is retained as history.
+- Home, Stack, Projects, project detail, Apply, Leaderboard and seven docs
+  section routes are separate views. Unknown routes have a Home link.
+- One wallet hook, transaction manager, data loader and cache live above
+  the routes. Switching all 14 tested routes made **zero extra log scans**.
+  The existing 15/60-second polling, Refresh, and confirmed-transaction
+  refresh remain. Registry event dates are fetched and cached with the
+  snapshot. Every page displaying live chain figures shows its block.
+- The top row has all six page links at 860px and above. Below it, Menu
+  discloses the links beneath the row. Native links support browser history
+  and static/IPFS deep links. Route changes set the title, scroll to top
+  and focus the h1. Current page links are underlined and use aria-current.
+- Apply retains the three token/approval/send steps and exact panel question.
+  Challenge lives on listed project pages, showing fee plus bond and the
+  pinned beneficiary. Errors are per field after blur or attempted action;
+  disabled actions explain the blocking condition underneath.
+- All app content boxes are a single column. Leaderboards also stack so
+  unequal table lengths cannot create empty space beside shorter boxes.
+  Docs navigation is the specified desktop sidebar/mobile select.
+- `dist/llms.txt` is byte-identical to the previous export. The palette,
+  six-size scale, compact geometry, theme handling, RPC order and gas ×1.3
+  remain. Contracts moved to Docs > Addresses; the footer links there.
 
-The original export was served under `/preview/` in Chromium
-155.0.8059.12. On an isolated Sepolia fork (chain 11155111), the existing
-Stacker was submitted with the valid 48-character name
-`ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV`, its Etherscan URL,
-50 bps and a fork-generated beneficiary. The browser minted the oracle
-test token, approved the fee and applied. After measuring the open question,
-the fork advanced 86,401 seconds, the automatic poll enabled Expire, and
-the browser expired it and measured the resulting outcome.
+## Build and focused tests
 
-| State, both themes | Before: page width at 360 / 390px | After |
-|---|---|---|
-| Open question | 432 / 432px | 360 / 390px |
-| Recent outcome | 432 / 432px | 360 / 390px |
+Dependencies were installed **only under `/tmp/imd-acc-routes/site`** from
+copies of the unchanged manifest/lockfile. npm caches were under `/tmp`.
+The final source was copied there, built and its export copied to repository
+`dist/`. All final browser checks below served that repository export.
 
-The unbroken text was 403.2px wide in this run. At 360px its heading had
-only 302px available. The same root cause reproduced even though these
-font metrics differ from the reviewer's reported 384px text width.
-
-`site/src/style.css:531` now allows long question headings to wrap anywhere.
-At `site/src/style.css:559`, outcome address wrappers and their project-name
-links allow normal whitespace and wrap anywhere. The complete name wraps
-onto two lines within 302px at 360px and 332px at 390px. Rows grow naturally;
-there is no clipping or ellipsis. Other hexadecimal address styles remain
-nonwrapping. These six CSS lines are the only runtime source change.
-
-The existing `site/test/browser.mjs` now exercises this exact name and
-asserts both states at 360, 390, 768 and 1280px, both themes. All **16 state,
-width and theme combinations passed**, including full name preservation,
-text fitting its box, two phone lines and no page overflow. The four final
-360px screenshots and the before screenshot were visually inspected and
-are retained in [overflow/](overflow/). Raw before/after measurements,
-browser results and detector results are in [overflow/results.json](overflow/results.json).
-
-The final source was copied to `/tmp/imd-overflow-33d5b248/site`; dependencies
-and npm caches remained outside the repository. Actual commands/results:
-
-- `npm ci`: installed the unchanged lockfile in that temporary directory.
-- `npm run build -- --outDir <repository>/dist`: passed ABI verification,
-  TypeScript and Vite; final export is 651,156 bytes. The generated JS differs
-  only in its CSS asset reference. `npm run typecheck` also passed separately.
-- `npm test`: 12 passed, 0 failed.
-- `PREVIEW_URL=http://127.0.0.1:4175/preview/ CHECK_MODE=fork
-  FORK_RPC=http://127.0.0.1:8549 CHROMIUM_PATH=<installed-chromium>
-  node test/browser.mjs`: passed all wallet, faucet, approve, credit,
-  refreshed balances/value/leaderboards, application, polling and expiry
-  checks. All submitted gas limits were estimate ×1.3, rounded up.
-- The same browser command with `CHECK_MODE=live` and no `FORK_RPC` passed
-  App and Docs at all four widths in both themes, starting at live block
-  11,891,763. Docs anchors, agent-guide copy, matching `llms.txt`, keyboard
-  navigation, remembered theme, reduced motion and RPC retry passed.
-- Across both completed runs: no page exceptions or console errors,
-  **22 axe scenarios with zero violations**, and loaded local fonts. At
-  390px the primary Connect wallet button ends at 369px, on the first screen.
-- `impeccable detect site/src site/index.html --json` (via
-  `npm exec --yes --package impeccable --`) and both running routes returned
-  no source or desktop findings. The `--viewport 360x800`
-  scan returned only the same two advisory `flat-type-hierarchy` entries
-  described below. The explicitly required type scale remains unchanged.
-
-The pinned Better Interface guide informed this scoped review across all
-six domains: accessibility (full names and native heading/link semantics,
-keyboard checks and axe); layout (both states and responsive widths);
-writing (complete project name and existing outcome copy); typography
-(loaded mono fonts and actual line wrapping); colors (unchanged tokens,
-both themes and axe contrast checks); UI (natural row height, usable Expire
-and outcome link, no new motion). The applicable layout/typography finding
-is fixed. DESIGN.md documents the resulting wrapping behavior.
-
-Complete for this revision's scope. Live Sepolia was read-only; all writes
-used fork state and deployed bytecode, with no deployment. No oracle-panel
-settlement was attempted. Native screen readers, physical phones, other
-browser engines, RTL and browser-native zoom were not tested. Prior limits
-below still apply. The fork's Stacker applicant tests contract prechecks,
-not panel eligibility. Final size and asset hashes are in `bundle-audit.json`.
-
-## Delivered build
-
-- App: `dist/index.html` at `#/`; docs: `#/docs` and section hash routes.
-- React 19, TypeScript 5.9, Vite 7 and ethers 6 source in `site/`.
-- Manifest and lockfile in `site/`. All installations and npm caches used
-  temporary directories outside the repository.
-- Production export: 651,043 bytes before this documentation/evidence.
-  Local fonts, favicon, social PNG, licenses and `llms.txt` are included.
-- HTML and CSS asset references resolve relative to the export. Tested
-  under `/preview/`, not only at a server root. The exported `llms.txt`
-  matches `site/public/llms.txt` byte for byte.
-- Title, description, favicon, `og:title` and `og:image` exist. The social
-  image is 1200×630. Its relative URL avoids inventing a final hosting name.
-- The source/export inventory and final size audit are in `bundle-audit.json`.
-
-## Commands and results
-
-The build workspace was `/tmp/imd-acc-site`; source was copied there to keep
-`node_modules` and caches out of the submission. The normal reproduction
-commands are in `site/README.md`.
-
-| Check | Actual result |
+| Command/check | Actual result |
 |---|---|
-| `forge build --out test/scratch/forge-out --cache-path test/scratch/forge-cache` | Pass, unchanged project sources compiled with solc 0.8.26 |
-| `node scripts/verify-abi.mjs` | Both canonical ABI hashes match the verified handoff |
-| Creation bytecode keccak from the compiled artifacts | Both match the verified handoff |
-| `npm run typecheck` | Pass |
-| `npm test` | 12 tests passed, 0 failed |
-| `npm run build -- --outDir /tmp/imd-acc-export` | Pass, ABI verification, typecheck and production build; no chunk-size warning in the final build |
-| Agent guide interfaces + integration fragment compiled in `test/scratch/AgentIntegration.sol` | Pass with the existing Foundry configuration; no deployment |
-| `git diff --check` | Pass |
-| Protected path diff / submodule check | No changes in contracts, existing build configuration, `lib/`, `.github/` or ignore files; no submodules |
+| `npm ci --prefix /tmp/imd-acc-routes/site --cache /tmp/imd-acc-routes/npm-cache --no-audit --no-fund` | Passed; 90 packages in the temporary workspace |
+| `npm run build --prefix /tmp/imd-acc-routes/site` | Passed: ABI verification, TypeScript and Vite production build |
+| `npm run typecheck --prefix /tmp/imd-acc-routes/site` | Passed separately |
+| `npm test --prefix /tmp/imd-acc-routes/site` | **16 passed, 0 failed** |
+| `git diff --check` | Passed |
+| Production export | **664,577 bytes**, including fonts, favicon, OG PNG, notices and unchanged llms.txt |
+| Static asset audit | Relative HTML/CSS asset references resolve inside the export; no dependency/runtime registry required |
+| Protected paths | No changes to contracts, manifests, lockfiles, Solidity build configuration, `.github/`, `.git/`, `.env`, `lib/`, or ignore files |
 
-ABI hashes (canonical recursively sorted object keys, array order retained):
+Node was **22.22.2**. The existing scripts verify these canonical ABI hashes:
 
 - Stacker: `3ad4d4dc48c1151d15761cc1702132efdebd29256fff2fd8b4fca37532cbb640`
 - ProjectRegistry: `99f136e9891dd024a34966657049bd24af8d796abe38964792bed12094a2f53e`
 
-Creation bytecode hashes:
+Both ABIs and the deployment handoff are unchanged. The app verifies the
+live chain, deployment code/receipt and dependency wiring before writes.
+This job did not recompile, change or deploy Solidity contracts.
 
-- Stacker: `6fc69b87eec0f874ab88a4e3ff7513a35d8d6fb6cd379fa517dc41bc03fea6b2`
-- ProjectRegistry: `af96cb7c212dbc50831eea024c58506f228875b1feb683612f10313a2f815cfa`
+The 16 tests cover listing boundaries/relisting, direct credits, ranking,
+log decoding/order/deduplication, integer arithmetic, text/URL/rate/address
+limits, ordered RPC fallback and range reduction, incomplete-history
+failure, code/listing/open-question preflight, fee/beneficiary/cooldown
+races, strict expiry boundaries, error messages and route parsing. New
+regressions check exact invalid-character names, field-bound code/registry
+errors and the cooldown date surviving transaction-error translation.
 
-The unit checks cover listing boundaries, delisting/relisting, direct
-credits, unique traders, rejection/defended outcomes, log order and
-deduplication, removed logs, large integer amounts, exact text/rate limits,
-ordered RPC fallback, range reduction without gaps, explicit history
-failure, application preflight, challenge fee/beneficiary/cooldown races,
-expiry's strict boundary and Intake completion, friendly errors and
-failure to verify a deployment.
+## Real-browser checks
 
-## Live Sepolia browser checks
+Chromium **154.0.8037.0**, Playwright 1.58.2 and axe-core were used against
+the production export at a temporary `/preview/` HTTP subpath. The harness
+owns and closes its server/browser. Live RPCs were not mocked in `live` mode.
+The first snapshot in the final live run was **Sepolia block 11,892,123**;
+the final fork run started at block **11,892,108**.
 
-Chromium 155 was exercised with Playwright 1.58.2, plus direct inspection
-through the assigned browser tool. The preview served the actual production
-export under `http://127.0.0.1:4173/preview/`.
+The supplied MCP browser connector could not initialize because its cache
+path was read-only (`EROFS`). The installed Chromium was therefore driven
+by Playwright directly; this is a real rendered-browser check, not a
+source-only substitute. Representative screenshots were opened and visually
+inspected with the image tool. Native-device/screen-reader testing is not
+claimed.
 
-The successful live run recorded block **11,891,489**. It verified the
-launch contracts and their dependency wiring, fetched real logs from
-11,891,109, and read the live vault and registry. The observed launch had
-no Stacked or application events; the vault was open. The registry fee was
-0.5000 oracle test IMD, the bond 5.0000, cooldown one hour and pending
-expiry one day. These values are read live in the UI, not used as fixed
-transaction quotes.
+Actual browser commands used the temporary source/test installation:
 
-`browser/live-results.json` records **16 page/theme/viewport combinations**:
-App and Docs at 360, 390, 768 and 1280px, each in light and dark. Each had:
+```sh
+EXPORT_DIR="$PWD/dist" CHECK_MODE=live EVIDENCE_DIR=/tmp/imd-acc-routes/final-live \
+  node /tmp/imd-acc-routes/site/test/browser.mjs
+EXPORT_DIR="$PWD/dist" CHECK_MODE=fork EVIDENCE_DIR=/tmp/imd-acc-routes/final-fork \
+  node /tmp/imd-acc-routes/site/test/browser.mjs
+EXPORT_DIR="$PWD/dist" CHECK_MODE=fixtures EVIDENCE_DIR=/tmp/imd-acc-routes/final-fixtures \
+  node /tmp/imd-acc-routes/site/test/browser.mjs
+EXPORT_DIR="$PWD/dist" CHECK_MODE=edges EVIDENCE_DIR=/tmp/imd-acc-routes/edges \
+  node /tmp/imd-acc-routes/site/test/browser.mjs
+```
 
-- Document scroll width equal to the viewport width.
-- Zero axe findings for the selected WCAG A/AA tags.
-- All three self-hosted font weights loaded.
-- No page exceptions or console errors in the completed run.
-
-At 390px, the main Connect wallet action is within the first 844px. At
-360px, the top control row stays below 60px tall, without wrapping or the
-Sepolia text. Screenshots in `browser/` show the app and docs at the three
-requested widths and both themes. Rendered screenshots were inspected,
-not inferred only from source or the accessibility tree.
-
-Navigation, docs section focus/scroll, the skip link, keyboard tab arrows
-and Home, system/remembered themes, reduced motion, copying the agent guide,
-and the matching static `llms.txt` all passed. A simulated RPC failure
-produced a visible retry state and disabled writes; Retry restored live
-Sepolia data. The wallet chooser uses a native dialog with Escape and focus
-restoration behavior. A no-wallet message was also inspected directly.
-
-## Wallet interaction checks
-
-A successful earlier full browser run used a local Anvil fork of Sepolia
-and the same production export. It exercised the real deployed bytecode on
-the fork, with an ephemeral impersonated/funded account, without a supplied
-private key. It passed:
-
-- EIP-6963 discovery with two providers, wallet choice and Sepolia switching.
-- A rejected signature and its plain per-button error message.
-- Faucet claim, next-claim state and 10,000.0000 test IMD balance refresh.
-- Exact TestIMD approval, then credit to the connected account.
-- Updated cashback, tsIMD, value, per-project row and recent stacks.
-  The credit was marked direct and points stayed 0.0000.
-- Minting 10 oracle test IMD, exact fee approval, and `applyListing`.
-- A question preview equal to the contract's `applyQuestion` return value.
-- The application appearing with project, kind, asker and age.
-- Advancing local time, expiry and a visible cleared-question outcome.
-- Every submitted gas limit equal to its captured estimate ×1.3, rounded up.
-
-The final fork run passed, including automatic 15-second polling for expiry without a manual refresh. Six populated-app width/theme cases at 360, 768 and 1280px also passed overflow and axe checks. Combined with the live run, that is 22 completed accessibility scenarios with zero findings and no console errors. The record is `browser/fork-results.json`. The test source supports `CHECK_MODE=live` and
-`CHECK_MODE=fork` to repeat the groups separately. Its `FORK_RPC` input is
-restricted to localhost. The fork application uses the already-deployed
-Stacker as a deliberately non-qualifying applicant to exercise contract
-prechecks; this is not evidence of panel eligibility.
-
-## Better Interface review
-
-The pinned workflow and the core principles of all six domains were read
-and applied during implementation. The explicit visual brief takes
-precedence over generic guide defaults, including compact type, square
-corners, 14px inputs and no decorative motion.
-
-| Domain | Coverage and evidence | Applicable findings and corrections |
+| Group | Coverage | Result/evidence |
 |---|---|---|
-| Accessibility | Native links/buttons/inputs/dialog; labels and described errors; heading order; visible focus; tabs, skip link, copy states, transaction live regions; browser/axe checks | `site/src/App.tsx:88` route targets originally lost the first character. Fixed hash slicing, heading focus and the skip destination. `site/src/ui.tsx:6` copy labels now follow visible success/failure text. `site/src/style.css:524` empty transaction statuses retain their live-region nodes instead of using display:none. |
-| Layout | Actual screenshots and overflow measurements at all requested widths; 390px main action; natural frame heights; internal table scrolling; desktop two-column composition | `site/src/App.tsx:365` wallet notices moved below the sticky bar to preserve its single control row. Project/recent table minimum widths are attached to the shared table component. |
-| Writing | Sentence-case headings/actions; staking and oracle tokens distinguished; direct/no-points labels; challenge bond consequence before action; loading/empty/retry states | Kept historical application rate explicit and explained event-share value versus currently held shares. Removed draft marketing phrasing and generic status badges. |
-| Typography | Loaded IBM Plex Mono 400/500/600; six-size scale; body line height; four-decimal amounts, aligned numbers, 75ch measure; mobile screenshots | Preserved the exact required scale. The mobile detector advisory below conflicts with that prescribed scale and was documented rather than hidden. |
-| Colors | Both rendered themes; text/paper/hover pairs measured; disabled colors isolated; statuses carry words | Readable secondary text uses dim, not faint. All measured readable text pairs meet 4.5:1; the minimum is light success text on hover at 4.52:1. Full values are in DESIGN.md. |
-| UI | Hover/focus/disabled/pending/success/error, native wallet dialog, Apply/Challenge panels, stable content, copy controls | `site/src/wallet.ts:355` keeps an action pending until its refresh completes, avoiding an enabled button that silently ignores a second click. Only color/background transitions remain; reduced motion removes them. |
+| Live Sepolia | 14 routes × 360/768/1280px × light/dark | **84 cases**, zero page overflow, single-row top bar, loaded local fonts, correct h1/title/focus; 84 axe scans with zero violations. `routes/live-results.json` |
+| Populated local fork | Home, Stack, Projects, project, Apply, Leaderboard × all three widths × both themes | **36 cases**, zero overflow and axe violations, including a 48-character unbroken project name. `routes/fork-results.json` |
+| Synthetic listed-project UI | Listed detail/Challenge × all three widths × both themes | **6 cases**, zero overflow and axe violations. `routes/fixtures-results.json` |
+| Boundary/recovery | Home, Stack, Apply, Addresses × 320/390/859/860px × both themes | **32 cases**, no page overflow; exact Menu/desktop breakpoint and one-row bar. Simulated RPC error and Retry recovery passed. `routes/edges-results.json` |
 
-A data validation finding was also repaired: `site/src/chain.ts:83`
-previously wrapped an RPC range-limit error in a generic Error, so the log
-reader could not reduce its chunk size. Preserving RpcError fixed the
-reproducing test; all ranges are now scanned without gaps. It remains an
-explicit error if the history cannot be read.
+There are **126 completed axe scenarios with zero violations** and 32
+additional boundary layout cases. Completed final runs had **no page
+exceptions, console errors or HTTP resource failures**. Accessibility scans
+are limited to the selected WCAG A/AA tags, not certification.
+
+The live run also exercised:
+
+- All 14 routes by direct deep link and reload, beneath `/preview/`.
+- Menu via mouse, Enter, Space and Tab; Escape/outside closure and returned
+  focus; current-page markers; browser back and forward.
+- Docs section select and previous/next links, one rendered section, agent
+  guide copy and matching static download.
+- Remembered theme, reduced-motion styles and the keyboard skip link.
+- At 390×844, the Home Connect wallet button ends at **493px**, in the first
+  screen, with the product explanation visible above it.
+- Sixteen Apply error cases: invalid address, no code, short/long name,
+  double quote, backslash, square bracket, non-ASCII, URL scheme and lengths,
+  rate boundaries/fraction, invalid beneficiary and zero beneficiary.
+  Each has the expected reason, alarm color and described invalid field.
+
+## Transactions on an isolated Sepolia fork
+
+The harness created an ephemeral account, impersonated/funded it only in
+Anvil, and used existing deployed bytecode. It deployed nothing. It passed:
+
+1. EIP-6963 discovery/choice, native dialog Escape/focus return and Sepolia switch.
+2. Wallet rejection with a recoverable per-action message.
+3. Faucet claim: 10,000 test IMD and the next-claim state.
+4. Exact TestIMD approval, then credit. Stack's cashback, held shares, value,
+   earned amount and project row update. Home's summary and Leaderboard's
+   recent stack update; direct credits retain zero points.
+5. Oracle-token mint, invalid-field checks on attempted approval, exact
+   fee approval and application. The question equals `applyQuestion`'s return.
+6. The application appears in Apply and its project route with a dated
+   Applied event, asker, age and Expire. The project field and disabled
+   send line explain its open question. Project filters and row link work.
+7. Advancing local time, Refresh, Expire and the cleared-question outcome
+   update both the project page and Apply.
+8. All **eight captured wallet send attempts**, including the rejected
+   request, carried gas limits equal to estimate ×1.3, rounded up.
+
+The Stacker was the fork's applicant solely to test contract prechecks;
+it is not a qualifying trading integration and no panel eligibility is claimed.
+
+The live registry had no listed project for a completed Challenge flow.
+Separate **synthetic RPC fixtures** tested all eight registry event kinds
+(Applied, Listed, Rejected, Challenged, Defended, Delisted, AskCleared,
+BeneficiarySet), 12 dated entries, periods, Challenge reason errors,
+cooldown date, open-question disabling, zero-beneficiary validation and
+Apply's Already listed error. These fixtures change browser responses only;
+they neither modify deployed contracts nor represent signed oracle outcomes.
+Source review confirms the send uses `challengeForBeneficiary` and the
+shown beneficiary; unit tests check preflight races. A successful Challenge
+transaction and signed panel settlement remain **unperformed**.
+
+## Better Interface review and fixes
+
+The pinned workflow and core principles of all six domains were read and
+applied during implementation. The existing design is authoritative; no
+new palette, font, larger type, motion or decorative component was introduced.
+
+| Domain | Coverage | Finding and correction |
+|---|---|---|
+| Accessibility | Native page links, h1 focus/title, menu keys/focus return, docs select, labels, inline errors, live statuses, dialog; browser/axe | `site/src/Header.tsx:17` supplies the disclosure and return focus; `site/src/App.tsx:81` handles route focus/title/scroll. `site/src/forms.tsx:45` and `:399` now track blur/action validation, attach each error to its field and explain disabled actions. |
+| Layout | Single-column source flow, measured 360/768/1280 pages plus 320/390/859/860 edges; representative screenshots | The old desktop app/listing/leaderboard column pairs left large spaces beside shorter boxes. `site/src/style.css:751` removes those pairs; `pages.tsx:534` keeps leaderboards sequential. Docs retain only their required navigation sidebar/select. No page overflow was measured. |
+| Writing | Labels/actions, field errors, empty states, historical rate, token distinction and challenge bond consequence | `site/src/model.ts:33` now distinguishes short/long text and names the offending character; `site/src/chain.ts:417` binds code/registry errors to fields. `site/src/wallet.ts:104` no longer changes every listing-cooldown error into a faucet message. |
+| Typography | Exact six-size scale, IBM Plex Mono 400/500/600 loaded, four-decimal/tabular values, long names and 75ch docs measure | `site/src/style.css:916` retains wrapping for project names/links while hexadecimal address links remain compact. No text size changed. Mobile Impeccable advisory is recorded below. |
+| Colors | Both rendered palettes, alarm-field styles, measured CSS foreground/background pairs, axe contrast | All readable token pairs on paper/hover meet 4.5:1; lowest is **4.52:1** for light success text on hover. Disabled faint tokens are restricted to disabled controls. Exact pairs are in `routes/edges-results.json` and DESIGN.md. |
+| UI | Loading, empty, error, pending, success, disabled explanations; copied address/guide, native controls, no layout animation | `site/src/pages.tsx:105` gathers project state/history/question/challenge. `site/src/chain.ts:302` fetches dates with shared data instead of on navigation. Existing square frames, compact controls and theme behavior remain. |
+
+Rechecked corrections pass the final build, focused tests and the browser
+cases above. Source review and rendered checks found no applicable remaining
+layout, error, navigation or palette issue. Modals, screen readers, native
+zoom and devices have the coverage limits below; no unperformed check is
+reported as a pass.
 
 ## Impeccable
 
-The following commands were run with `IMPECCABLE_BROWSER` pointing at the
-installed Chromium executable for URL scans:
+`site/test/detect.mjs` ran `npm exec --package impeccable -- impeccable detect`
+(the `npx impeccable detect` equivalent), with source plus index.html, and
+all 14 running routes at **1280×900** and **360×900**. Cache and browser
+configuration stayed under `/tmp`. Current raw results are
+`routes/impeccable-source.json`, `routes/impeccable-desktop.json` and
+`routes/impeccable-mobile.json`.
 
-```sh
-npx impeccable detect site/src site/index.html --json
-npx impeccable detect http://127.0.0.1:4173/preview/ \
-  http://127.0.0.1:4173/preview/#/docs --json
-npx impeccable detect --viewport 360x800 \
-  http://127.0.0.1:4173/preview/ \
-  http://127.0.0.1:4173/preview/#/docs --json
-```
+- Source: clean, `[]`.
+- Desktop: clean, `[]`.
+- Mobile: only **11 advisory `flat-type-hierarchy` entries**, describing the
+  inherited 18/15/14/13px compact hierarchy. Changing the size step would
+  violate the explicit instruction to preserve text sizes. Weight, spacing,
+  heading semantics and frames preserve hierarchy. No detector ignore or
+  suppression rules were added. There are no non-advisory findings.
 
-Source and desktop scans returned `[]`. The 360px scan returned no primary
-findings and two **advisory** `flat-type-hierarchy` entries, one for each
-page. They report the required 18/15/14/13px compact mobile scale. Increasing
-a size step would conflict with the task's exact type sizes; weight 600,
-spacing and semantic headings supply the hierarchy. The prescribed scale
-is retained. No detector ignore rules or suppressions were added. The raw
-results are `impeccable-source.json`, `impeccable-page.json` and
-`impeccable-mobile.json`.
+Initial detector URL launches failed because Chromium needed a writable
+config directory and its sandbox was unavailable in this container. A
+small temporary launcher supplied `--no-sandbox`; `XDG_CONFIG_HOME` pointed
+to a temporary directory. One parallel validation attempt also exhausted
+browser thread resources; it was stopped and rerun sequentially. Successful
+runs above are the recorded results, not those startup failures. An early
+axe measurement caught controls midway through the existing 150ms theme
+transition; checks now wait for the settled theme before measuring contrast.
 
-The review also checked the explicit prohibitions by source and rendered
-inspection: no hero metrics, ornamental labels/badges, repeated card grids,
-nested frames, side stripes, shadows, gradients, blur, glow, moving layout,
-pulsing/blinking effects or animated entrances. The numbered Apply flow is
-the only numbered UI sequence.
+The manual Impeccable pass also checked the retained conventions: no hero
+metrics, oversized figures, ornamental labels/badges, repeated metric-card
+arrays, nested frames, side stripes, gradients, shadows, blur, glow, moving
+layout, blinking/pulsing or entrance animation. Apply is the only visual
+numbered step sequence.
 
-## Limits
+## Limits and delivery audit
 
-- There was no supplied connected/funded wallet for real Sepolia writes.
-  Live verification was read-only; writes ran on an isolated local fork.
-- No signed oracle-panel settlement or successful listed-project challenge
-  was sent. The live registry had no listed project. Challenge eligibility,
-  expected beneficiary, fee races, cooldown, text constraints and error
-  decoding have focused tests; listing periods and outcomes have event
-  fixtures. These do not certify a future panel decision.
-- Native screen-reader sessions, physical mobile devices, Safari, Firefox,
-  RTL and browser-native 200% zoom were not tested. Responsive screenshots
-  and an axe run are not substitutes for those checks.
-- The generic typography guide's 16px mobile-input preference was superseded
-  by the brief's explicit 14px inputs; native iOS behavior was not measured.
-- A first URL detector attempt could not locate Chrome; supplying its path
-  resolved that. Early harness attempts also used an unsupported WebP
-  screenshot option and lost temporary preview/fork processes; these were
-  repaired. A populated-state accessibility run hit a four-minute harness
-  timeout; the final run gives primary interactions priority and allows a
-  longer bounded audit. Only completed result files are reported as passes.
-- Hosting was not performed. The submission delivers the complete static
-  export for the publisher, as requested.
+- Live Sepolia verification was read-only. Wallet writes used a local fork.
+- Signed panel settlement and a successful listed-project challenge were
+  not performed; synthetic fixtures are labeled separately above.
+- No native screen reader, physical phone, Safari/Firefox, native 200% zoom,
+  localization/RTL or iOS input-zoom test was run. The required inherited
+  14px inputs remain, despite the generic guide's 16px mobile preference.
+- System/remembered theme logic is unchanged; remembered choice was tested.
+  Exact visual behavior under every OS/browser setting is not claimed.
+- Browser and detector tools run in this worker, not as independent reviewers.
+- Final source/export size and hashes, protected-path checks, relative assets
+  and dependency/cache exclusions are recorded in `bundle-audit.json`.
+  No ignore file was changed and no git submodule was introduced.

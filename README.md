@@ -2,6 +2,13 @@
 
 **Launch adaptation:** see [ADAPTATION.md](ADAPTATION.md) for reproduced audit findings, fixes, tests and remaining release steps. The Sepolia test run 2 app and docs are in [site/](site/README.md), with the complete static export in [dist/](dist/). See [DESIGN.md](DESIGN.md) and the [validation record](site/validation/VALIDATION.md). Its launch addresses come from the verified deployment handoff.
 
+The current website has separate Home, Stack, Projects, Apply, Leaderboard
+and Docs hash routes, including individual project and docs-section pages.
+The complete static export is in `dist/`; installation, preview, rebuild and
+publication steps are in the [website README](site/README.md). The
+[validation record](site/validation/VALIDATION.md) documents live Sepolia reads,
+local-fork transaction checks and remaining verification limits.
+
 **Trading cashback in staked IMD.** Every trade in a participating project sends part of the trade, between 0.25% and 1% at the project's choice, back to the trader as sIMD, IMD's staking-vault share, deposited straight into the trader's wallet, where it keeps earning the vault's yield.
 
 | | |

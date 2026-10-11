@@ -1,18 +1,34 @@
 # imd/acc Sepolia test run 2 site
 
-The app is `#/`; the documentation is `#/docs`. The published artifact is
-[`../dist/`](../dist/), including `llms.txt`, local fonts, favicon and social
-image. It needs only a static HTTP server. No backend, keys, runtime npm
-registry or contract deployment is needed.
+The finished static site is [`../dist/`](../dist/). It contains all runtime
+JavaScript, CSS, fonts, favicon, social image, licenses and the unchanged
+`llms.txt`. It needs a static HTTP server and public Sepolia RPC access;
+there is no backend, private key, runtime npm registry or contract deployment.
+
+## Pages
+
+| Route | Content |
+|---|---|
+| `#/` | Product explanation, facts, wallet summary, vault status, last five stacks |
+| `#/stack` | Complete personal stack, faucet and stack-to-myself tools |
+| `#/projects` | All / Listed / Applied / Delisted project table |
+| `#/projects/<address>` | State, historical rate, beneficiary, periods, dated history, open question, Challenge |
+| `#/apply` | Three-step application, exact panel question, open questions and outcomes |
+| `#/leaderboard` | Top stackers, top projects and last ten stacks |
+| `#/docs/what`, `/how`, `/addresses`, `/integrate`, `/listing`, `/points`, `/agents` | One docs section per hash route (each path starts `#/docs/`) |
+
+`#/docs` also opens What it is. Unknown routes show a Home link. Hash URLs
+work on reload at an IPFS gateway subpath without server rewrite rules.
+The footer's Contracts link opens Docs > Addresses.
 
 ## Install and rebuild
 
-Requires Node.js 22.12+ (validated with Node 24.21.0) and npm. React,
-TypeScript, Vite and ethers are pinned in this directory's manifest and
-lockfile. The repository's Solidity build configuration is unchanged.
+Requires Node.js 22.12+ and npm; this revision used Node **22.22.2**.
+React, TypeScript, Vite, ethers and test dependencies remain pinned in the
+unchanged `package.json` and `package-lock.json`.
 
-Build in a disposable directory so no dependency or cache directories enter
-the submission. Run these commands from the repository root:
+Build in a disposable directory to keep dependency and cache directories
+out of the repository. From the repository root:
 
 ```sh
 site_build_dir="$(mktemp -d /tmp/imd-acc-site.XXXXXX)"
@@ -23,118 +39,105 @@ npm test --prefix "$site_build_dir"
 npm run build --prefix "$site_build_dir" -- --outDir "$PWD/dist"
 ```
 
-The build verifies both canonical ABI hashes, runs TypeScript, and exports
-Vite's production output. `base: './'` gives relative asset URLs. Building
-replaces only `dist/`. No Foundry dependencies are installed or changed.
-
-For normal development in a separate working copy, `cd site`, `npm ci`,
-`npm run dev`, and `npm run build` work too. Never include generated
-`node_modules`, npm caches or dependency archives in a submission.
+The production build verifies both canonical ABI hashes, runs TypeScript
+and writes Vite's output. `base: './'` makes exported asset URLs relative.
+Rebuild after any runtime source change. Keep the complete export alongside
+the source and lockfile in the submission. Do not include `node_modules`,
+caches, dependency archives or a registry mirror. No ignore file changes
+are needed. Existing Solidity build configuration and dependencies are unchanged.
 
 ## Preview
 
-From the repository root:
+From the repository root, serve the export in a terminal:
 
 ```sh
 python3 -m http.server 4173 --bind 127.0.0.1 --directory dist
 ```
 
-Open `http://127.0.0.1:4173/#/`, `http://127.0.0.1:4173/#/docs` and
-`http://127.0.0.1:4173/llms.txt`. Serve over HTTP rather than opening the HTML
-as a `file:` URL. Wallet actions use an injected EIP-6963 or legacy provider.
-The wallet must be on Sepolia and have Sepolia ETH for gas.
+Open `http://127.0.0.1:4173/#/`, or append any route above. Stop the server
+with Ctrl+C. Use HTTP rather than opening `index.html` as a file. Wallet
+actions support EIP-6963 and legacy injected providers; Sepolia ETH pays gas.
 
 ## Publish
 
-Publish the complete contents of `dist/` to a static host or IPFS directory.
-Keep the `assets/` and `fonts/` directories beside `index.html`; no rewrite
-rules or rebuild are needed. Hash routes work at a gateway subpath. In the
-IdentityMD contributor flow, the committed export is the publishing input;
-this assignment does not invoke a publishing command. `og:image` is relative
-because the final host name is assigned after submission.
+Copy the complete `dist/` directory to a static host or pin its contents to
+IPFS. Keep `assets/`, `fonts/`, `llms.txt`, `favicon.svg` and `og.png` beside
+`index.html`. No rebuild or rewrite service is required at the host. In the
+IdentityMD contributor flow the submitted export is the publishing input;
+this job did not publish or deploy anything. The existing relative `og:image`
+reference works at the assigned hosting subpath.
 
-## Data and transactions
+## Shared data and wallet state
 
-- Stacker and ProjectRegistry are copied from the verified launch handoff in
-  `src/deployment.json`, source commit
-  `ef39dd18d1c65faaaa49c0a4a3f162960d594f18`, deployment block 11,891,109.
-- Full ABIs in `src/abi/` were generated from the unchanged Solidity sources
-  with solc 0.8.26. Both canonical ABI hashes and creation bytecode hashes
-  match the handoff. `scripts/verify-abi.mjs` checks the ABI hashes at build.
-- Before enabling writes, the app verifies chain ID, code at deployment and
-  now, absence of code before deployment, the successful deployment receipt,
-  and Stacker/registry/vault dependency wiring.
-- Reads fall back in order: ethpandaops, sentio, publicnode. Logs are scanned
-  in chunks of at most 1,000 blocks, reduced on provider range-limit errors.
-  A failed scan never becomes a partial leaderboard. Reads share a block
-  tag. The cache rescans the last 12 blocks and is invalidated on a changed
-  previous block hash; the completed snapshot's hash is checked again.
-- All registry events reconstruct listing periods. Points use
-  `fromBlock <= event.block < toBlock`; open periods have no upper bound.
-  Current wallet shares are separate from event shares used for value.
-- Open questions trigger a 15-second refresh. Otherwise data refreshes each
-  minute. Every confirmed transaction triggers a refresh. The loaded block
-  is visible. A refresh failure retains clearly marked old data and
-  disables writes until a successful refresh.
-- Each action estimates gas and sends the estimate multiplied by 1.3,
-  rounded up. Account/network are checked before estimation and signing.
-  Application and challenge preflight checks run again before sending.
-  Approvals use exactly the current oracle fee (plus bond for challenges).
-- The agent guide in `public/llms.txt` is imported verbatim into the docs;
-  it is also copied unchanged to `dist/llms.txt`.
+`App.tsx` owns one wallet connection, transaction manager, `DataLoader`
+and snapshot above all routes. Page changes do not scan logs. Refresh and
+every confirmed transaction refresh the snapshot; the existing automatic
+15-second open-question / 60-second idle polling remains. Pages with live
+chain figures show the snapshot block. A refresh error marks retained data
+as stale and disables writes. Event dates are cached with registry history.
+
+The existing RPC order is **ethpandaops → sentio → publicnode**. Chain ID,
+code at deployment and now, the deployment receipt and dependency wiring
+are checked before enabling transactions. The deployment starts at block
+11,891,109; both bundled ABI hashes still match the verified handoff.
+
+The existing 12-block reorg overlap, chunked log reads and consistent-block
+snapshot checks remain. Points use inclusive `fromBlock` and exclusive
+`toBlock`. Wallet-held shares remain distinct from event shares used to
+calculate cashback value. All sends use gas estimates **×1.3, rounded up**.
+Oracle approvals use exactly the live fee, plus bond for challenges.
+`challengeForBeneficiary` submits the beneficiary displayed for that project.
 
 ## Validation
 
-Actual results, review findings, screenshots, commands and limitations are
-in [`validation/VALIDATION.md`](validation/VALIDATION.md). The final
-production build, typecheck and 12 focused tests pass. Browser validation
-uses the production export at a subpath, live Sepolia reads, and a local
-Sepolia fork for transactions. No live-chain transaction was sent.
+See [`validation/VALIDATION.md`](validation/VALIDATION.md) for actual worker
+results, the six-domain Better Interface review, findings and limitations.
+The production build, separate typecheck and **16 focused tests passed**.
+Chromium checked every route at 360, 768 and 1280px in both themes against
+live Sepolia. Local-fork transactions covered wallet choice, switch,
+rejection, faucet, approval, credit, application and expiry. No live-chain
+transaction was sent and no contract was deployed or modified.
 
-The browser test checks both pages at 360, 390, 768 and 1280 pixels, both
-light and dark themes, overflow, local fonts, axe accessibility findings,
-keyboard tabs and skip link, remembered theme, docs anchors and agent guide
-copy/download. With a local fork it also checks wallet discovery, chain
-switch, signature rejection, faucet, approval, credit, application and
-expiry. Test accounts are generated and funded only on that fork.
-
-The fork check also applies a 48-character unbroken project name and
-checks Open questions before and after expiry at 360, 390, 768 and 1280px
-in both themes. It asserts the complete name stays within its box, phone
-names wrap onto two lines, and the page has no horizontal overflow.
-
-To repeat it, preview the production export, install a Playwright Chromium
-browser in the disposable build environment, and run:
+The browser harness owns a temporary `/preview/` server and closes it when
+finished. It validates the real export, not Vite's development server.
+After installing dependencies into the disposable build directory:
 
 ```sh
-PREVIEW_URL=http://127.0.0.1:4173/ npm run test:browser --prefix "$site_build_dir"
+EXPORT_DIR="$PWD/dist" CHECK_MODE=live \
+  npm run test:browser --prefix "$site_build_dir"
+EXPORT_DIR="$PWD/dist" CHECK_MODE=fork \
+  npm run test:browser --prefix "$site_build_dir"
+EXPORT_DIR="$PWD/dist" CHECK_MODE=fixtures \
+  npm run test:browser --prefix "$site_build_dir"
+EXPORT_DIR="$PWD/dist" CHECK_MODE=edges \
+  npm run test:browser --prefix "$site_build_dir"
 ```
 
-Set `CHECK_MODE=live` or `CHECK_MODE=fork` to run the two groups separately. The fork mode requires `FORK_RPC`. Set `CHROMIUM_PATH` to an existing Chromium executable if needed. Evidence
-is written under `/tmp/imd-acc-browser-evidence` by default; `EVIDENCE_DIR`
-can select another temporary output directory.
+Set `CHROMIUM_PATH` to an installed Chromium executable and `ANVIL_PATH`
+to Anvil if the defaults in the script do not match your machine. Set
+`EVIDENCE_DIR` to select a temporary report/screenshot directory. `fork`
+starts and stops its own isolated local Sepolia fork, creates an ephemeral
+impersonated account, funds it locally and advances local time for expiry.
+It uses the existing Stacker as a deliberately non-qualifying applicant to
+exercise contract prechecks, not panel eligibility. `fixtures` uses clearly
+synthetic registry RPC responses for listed/challenged states; it does not
+claim a signed oracle outcome or successful challenge transaction. `edges`
+checks 320/390px and the 859/860px breakpoint, contrast and RPC retry.
 
-For the transaction checks, start an isolated local fork in another terminal:
-
-```sh
-anvil --fork-url https://rpc.sepolia.ethpandaops.io \
-  --chain-id 11155111 --port 8547 --silent
-```
-
-Then run the same browser test with `FORK_RPC=http://127.0.0.1:8547`.
-**Use only a local Anvil fork for this variable.** The test impersonates a
-fresh account, funds it locally and advances local time for expiry. It uses
-an existing non-trading contract to test application prechecks, not panel
-eligibility. It deploys no contracts and sends no transaction to Sepolia.
-
-The optional social image can be rebuilt with `npm run social` in the
-build directory, using the same Chromium setup. Its source uses the local
-IBM Plex Mono font. The generated `public/og.png` is included already.
+Run Impeccable against source and the served export with
+`EXPORT_DIR="$PWD/dist" node "$site_build_dir/test/detect.mjs"`.
+This invokes `npx`'s equivalent `npm exec --package impeccable -- impeccable
+detect`, with temporary cache storage. It scans source and all routes at
+1280 and 360px. The restricted worker environment required a Chromium
+launcher supplying `--no-sandbox` and a writable temporary `XDG_CONFIG_HOME`.
+Source and desktop scans are clean. Mobile reports only the pre-existing
+compact-type advisory; the task explicitly requires those exact sizes.
 
 ## Design and licenses
 
-[`../DESIGN.md`](../DESIGN.md) records the implemented tokens, type scale,
-components and responsive behavior. The pinned Better Interface guide was
-applied across accessibility, layout, writing, typography, colors and UI.
-See [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) for bundled software,
-font and design-guidance attribution.
+[`../DESIGN.md`](../DESIGN.md) documents the implemented colors, typography,
+components and responsive behavior. Existing tokens, theme handling and
+compact/Impeccable conventions are retained. The pinned Better Interface
+guide informed accessibility, layout, writing, typography, colors and UI.
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) and `DESIGN-LICENSE` retain
+software, font and design-guidance attribution.
