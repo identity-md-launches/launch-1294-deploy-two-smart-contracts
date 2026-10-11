@@ -97,7 +97,7 @@ Every `Stacked` event is kept as a record. Points are the basis for the leaderbo
 - **Trader points:** 1 point per IMD stacked for the trader.
 - **Project points:** the IMD its traders stacked.
 - **Listed projects only.** Anyone can call `credit` with their own IMD; that's just staking for someone, so it earns no points. Only credits from a listed project count, from the block it was listed (`fromBlock`), never before.
-- **The list today** is `projects.json` on the test page (`{address, name, fromBlock}`). Later, an ownerless `ProjectRegistry` decided by an IMD oracle panel replaces it ([design notes](docs/design.md#which-projects-earn-points)).
+- **The list today** is `projects.json` on the first test page (`{address, name, fromBlock}`). The test run 2 page reads [`listings/sepolia.json`](listings/sepolia.json) from this repository instead, so listing a project there is a commit, not a paid job. Later, an ownerless `ProjectRegistry` decided by an IMD oracle panel replaces it ([design notes](docs/design.md#which-projects-earn-points)).
 - **How they're counted:** by adding up the `Stacked` events, which can't be changed or deleted. An indexer keeps the totals ready for the site; project totals are also on chain.
 
 **What a trader sees on the dashboard**, with no visit to the vault's site:
@@ -155,7 +155,7 @@ Rules:
 
 ## Roadmap
 
-1. **List PLEA on the test page** so PLEA traders earn points. Ready and tested locally. [`jobs/3-list-plea.md`](jobs/3-list-plea.md)
+1. **Sepolia test run 2:** the new Stacker on the live test pair, with a new test page, in one order. PLEA's next version then credits through it. [`jobs/5-sepolia-v2-launch.md`](jobs/5-sepolia-v2-launch.md)
 2. **Deploy the Stacker on Ethereum mainnet** from this repository, with a full audit by the IMD swarm. PLEA mainnet needs its address. [`jobs/4-mainnet-launch.md`](jobs/4-mainnet-launch.md)
 3. **Indexer and mainnet dashboard:** the events kept in a fast table, then the site with each trader's cashback, points and value, and the leaderboards.
 4. **Multichain:** Robinhood Chain first (PondPad), then Base and Arbitrum. Cashback waits per trader on that chain and goes to Ethereum through IMD's own LayerZero bridge, paid by a small tip ([design](docs/design.md#multichain-cashback-from-other-chains)).
@@ -184,7 +184,10 @@ jobs/                     IMD swarm job prompts, in order
   2-sepolia-site.md       the test page (done, job 5530dde0)
   3-list-plea.md          list PLEA on the test page (ready)
   4-mainnet-launch.md     the mainnet Stacker (ready)
+  5-sepolia-v2-launch.md  Sepolia test run 2: the new Stacker on the live test pair (ready)
+  5-sepolia-v2-site.md    its test page, built in the same order (ready)
   requests/               exact request bodies for the ready jobs
+listings/sepolia.json     projects that earn points on the Sepolia test run 2 page
 NEXT_SESSION.md           the brief for the next working session
 ```
 

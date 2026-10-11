@@ -66,6 +66,8 @@ The only thing lost is that another contract can't ask the Stacker directly for 
 - what their cashback is worth today: the shares recorded in their events, priced by the vault's `convertToAssets`, live. This values only the cashback shares, even if they hold other sIMD;
 - earned on top: worth today − cashback received.
 
+**Where the list lives (2026-10-11, test run 2):** the new test page fetches `listings/sepolia.json` from this repository on GitHub (CORS is open), with a bundled copy as fallback. Listing a project is a commit, instead of a paid site job each time. The trust is the same as before (whoever controls the list); the ProjectRegistry replaces it later.
+
 **Indexer:** the test page scans events in the browser, which is fine for hundreds of events and too slow for thousands. IMD's `build-ponder-indexer` skill builds an indexer that keeps every chain's events in a table and serves the site. Order: mainnet Stacker, then the indexer, then the mainnet dashboard.
 
 ## Multichain: cashback from other chains
