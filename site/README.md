@@ -98,6 +98,11 @@ copy/download. With a local fork it also checks wallet discovery, chain
 switch, signature rejection, faucet, approval, credit, application and
 expiry. Test accounts are generated and funded only on that fork.
 
+The fork check also applies a 48-character unbroken project name and
+checks Open questions before and after expiry at 360, 390, 768 and 1280px
+in both themes. It asserts the complete name stays within its box, phone
+names wrap onto two lines, and the page has no horizontal overflow.
+
 To repeat it, preview the production export, install a Playwright Chromium
 browser in the disposable build environment, and run:
 

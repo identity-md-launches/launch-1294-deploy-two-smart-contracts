@@ -5,6 +5,87 @@ limitations; they are not independent certification. No live-chain
 transaction was sent, and no contract source, deployment, Solidity build
 configuration or existing dependency was changed.
 
+## Revision: long project names
+
+Finding `2eea5bd6793f75042630339a806a12a7707d15764829f6cbe4ae83e280162767`
+was reproduced before editing, then fixed. This section records the new
+checks; the original implementation record below is retained as history.
+
+The original export was served under `/preview/` in Chromium
+155.0.8059.12. On an isolated Sepolia fork (chain 11155111), the existing
+Stacker was submitted with the valid 48-character name
+`ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV`, its Etherscan URL,
+50 bps and a fork-generated beneficiary. The browser minted the oracle
+test token, approved the fee and applied. After measuring the open question,
+the fork advanced 86,401 seconds, the automatic poll enabled Expire, and
+the browser expired it and measured the resulting outcome.
+
+| State, both themes | Before: page width at 360 / 390px | After |
+|---|---|---|
+| Open question | 432 / 432px | 360 / 390px |
+| Recent outcome | 432 / 432px | 360 / 390px |
+
+The unbroken text was 403.2px wide in this run. At 360px its heading had
+only 302px available. The same root cause reproduced even though these
+font metrics differ from the reviewer's reported 384px text width.
+
+`site/src/style.css:531` now allows long question headings to wrap anywhere.
+At `site/src/style.css:559`, outcome address wrappers and their project-name
+links allow normal whitespace and wrap anywhere. The complete name wraps
+onto two lines within 302px at 360px and 332px at 390px. Rows grow naturally;
+there is no clipping or ellipsis. Other hexadecimal address styles remain
+nonwrapping. These six CSS lines are the only runtime source change.
+
+The existing `site/test/browser.mjs` now exercises this exact name and
+asserts both states at 360, 390, 768 and 1280px, both themes. All **16 state,
+width and theme combinations passed**, including full name preservation,
+text fitting its box, two phone lines and no page overflow. The four final
+360px screenshots and the before screenshot were visually inspected and
+are retained in [overflow/](overflow/). Raw before/after measurements,
+browser results and detector results are in [overflow/results.json](overflow/results.json).
+
+The final source was copied to `/tmp/imd-overflow-33d5b248/site`; dependencies
+and npm caches remained outside the repository. Actual commands/results:
+
+- `npm ci`: installed the unchanged lockfile in that temporary directory.
+- `npm run build -- --outDir <repository>/dist`: passed ABI verification,
+  TypeScript and Vite; final export is 651,156 bytes. The generated JS differs
+  only in its CSS asset reference. `npm run typecheck` also passed separately.
+- `npm test`: 12 passed, 0 failed.
+- `PREVIEW_URL=http://127.0.0.1:4175/preview/ CHECK_MODE=fork
+  FORK_RPC=http://127.0.0.1:8549 CHROMIUM_PATH=<installed-chromium>
+  node test/browser.mjs`: passed all wallet, faucet, approve, credit,
+  refreshed balances/value/leaderboards, application, polling and expiry
+  checks. All submitted gas limits were estimate ×1.3, rounded up.
+- The same browser command with `CHECK_MODE=live` and no `FORK_RPC` passed
+  App and Docs at all four widths in both themes, starting at live block
+  11,891,763. Docs anchors, agent-guide copy, matching `llms.txt`, keyboard
+  navigation, remembered theme, reduced motion and RPC retry passed.
+- Across both completed runs: no page exceptions or console errors,
+  **22 axe scenarios with zero violations**, and loaded local fonts. At
+  390px the primary Connect wallet button ends at 369px, on the first screen.
+- `impeccable detect site/src site/index.html --json` (via
+  `npm exec --yes --package impeccable --`) and both running routes returned
+  no source or desktop findings. The `--viewport 360x800`
+  scan returned only the same two advisory `flat-type-hierarchy` entries
+  described below. The explicitly required type scale remains unchanged.
+
+The pinned Better Interface guide informed this scoped review across all
+six domains: accessibility (full names and native heading/link semantics,
+keyboard checks and axe); layout (both states and responsive widths);
+writing (complete project name and existing outcome copy); typography
+(loaded mono fonts and actual line wrapping); colors (unchanged tokens,
+both themes and axe contrast checks); UI (natural row height, usable Expire
+and outcome link, no new motion). The applicable layout/typography finding
+is fixed. DESIGN.md documents the resulting wrapping behavior.
+
+Complete for this revision's scope. Live Sepolia was read-only; all writes
+used fork state and deployed bytecode, with no deployment. No oracle-panel
+settlement was attempted. Native screen readers, physical phones, other
+browser engines, RTL and browser-native zoom were not tested. Prior limits
+below still apply. The fork's Stacker applicant tests contract prechecks,
+not panel eligibility. Final size and asset hashes are in `bundle-audit.json`.
+
 ## Delivered build
 
 - App: `dist/index.html` at `#/`; docs: `#/docs` and section hash routes.

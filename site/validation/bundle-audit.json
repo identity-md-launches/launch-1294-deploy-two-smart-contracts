@@ -1,15 +1,16 @@
 {
   "limitBytes": 8388608,
-  "candidateBytesBeforeThisSmallReport": 3913444,
-  "existingGitPackKiB": 579,
-  "conservativeBytesIncludingExistingPacks": 4506340,
-  "productionExportBytes": 651043,
-  "candidateFileCount": 184,
+  "candidateBytes": 4202036,
+  "existingGitPackKiB": 2149,
+  "conservativeBytesIncludingExistingPacks": 6402612,
+  "productionExportBytes": 651156,
+  "candidateFileCount": 191,
   "noDependencyOrCacheDirectories": true,
   "noDependencyArchives": true,
   "ignoreFilesChanged": false,
   "contractsOrExistingBuildConfigurationChanged": false,
   "submodules": 0,
+  "requiredResponseIncludedInByteCount": true,
   "export": [
     {
       "path": "dist/THIRD-PARTY-NOTICES.txt",
@@ -22,12 +23,12 @@
       "sha256": "ba3c8131d9f9ab23ebb1a90496790f739443fca92a2856173e2d0f12a95d54c0"
     },
     {
-      "path": "dist/assets/index-92O0W8B9.css",
-      "bytes": 11838,
-      "sha256": "86ecc1426ee59704c8d27367c8fb0daa417675819d3401316e3da0486bbd8d67"
+      "path": "dist/assets/index-DLHKj_H7.css",
+      "bytes": 11951,
+      "sha256": "69fbd7c043c1eeb1b0dcaf972a34a8ad9532e4b25b4fc25c8e516d195418a7d7"
     },
     {
-      "path": "dist/assets/index-Ct3uVuGA.js",
+      "path": "dist/assets/index-DUU543FI.js",
       "bytes": 271646,
       "sha256": "92bb61b96006ff3dfc79cb041915f756cdfa1a2d1180c23a33fab35f74859327"
     },
@@ -64,7 +65,7 @@
     {
       "path": "dist/index.html",
       "bytes": 2079,
-      "sha256": "3e98517a9bf62ae5c23e14b566b1d763e25b29135d7ad4e9de3cf51c0ce7ce12"
+      "sha256": "acdab0d322e456e051d1d153255158661733c075d17e9ecde63aa8c795fdd1be"
     },
     {
       "path": "dist/llms.txt",

@@ -70,6 +70,12 @@ are uppercase with `.06em` tracking. Text paragraphs, docs content and code
 have a maximum measure of 75ch. Code wraps, including long addresses.
 Headings balance their lines. There are no text labels above headings.
 
+Open-question project headings and recent-outcome project links use
+`overflow-wrap: anywhere`. Outcome links and their `.address` wrappers
+allow normal whitespace, so an unbroken 48-character name stays visible
+and the row grows naturally. Hexadecimal address displays retain their
+compact nonwrapping format elsewhere.
+
 Numbers use tabular figures. Amounts display four decimal places using
 integer token arithmetic, with truncation for display. Numeric table
 columns align right. Addresses display `0x1234...abcd`; links expose their

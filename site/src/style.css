@@ -530,6 +530,7 @@ td .secondary {
 }
 .question-row h3 {
   margin: 0 0 6px;
+  overflow-wrap: anywhere;
 }
 .question-row > button {
   margin-top: 12px;
@@ -554,6 +555,11 @@ td .secondary {
 .outcome-list li {
   padding: 10px 0;
   border-top: 1px solid var(--line);
+}
+.outcome-list .address,
+.outcome-list .address a {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .board-columns {
   display: grid;

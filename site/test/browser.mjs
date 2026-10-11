@@ -447,8 +447,9 @@ try {
       await p.evaluate(() => window.__walletControl.gasChecks.every(Boolean)),
       "every transaction uses its estimate multiplied by 1.3",
     );
+    const projectName = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV";
     await p.locator("#apply-project").fill(stacker);
-    await p.locator("#apply-name").fill("Local fork integration check");
+    await p.locator("#apply-name").fill(projectName);
     await p
       .locator("#apply-url")
       .fill(`https://sepolia.etherscan.io/address/${stacker}`);
@@ -463,7 +464,7 @@ try {
           to: registry,
           data: registryInterface.encodeFunctionData("applyQuestion", [
             stacker,
-            "Local fork integration check",
+            projectName,
             `https://sepolia.etherscan.io/address/${stacker}`,
             50,
             tester,
@@ -502,10 +503,65 @@ try {
       () =>
         document
           .querySelector("#questions")
-          .innerText.includes("Local fork integration check") &&
+          .innerText.includes("ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV") &&
         document.querySelector("#questions").innerText.includes("Application"),
       "Application appears in open questions with project, asker and age.",
     );
+    const checkQuestionWidth = async (state) => {
+      for (const width of [360, 390, 768, 1280])
+        for (const theme of ["light", "dark"]) {
+          await p.setViewportSize({ width, height: 800 });
+          if ((await p.locator("html").getAttribute("data-theme")) !== theme)
+            await p.locator(".theme-button").click();
+          await p.evaluate(() => document.fonts.ready);
+          const measurement = await p.evaluate((state) => {
+            const element = document.querySelector(
+              state === "open" ? ".question-row h3" : ".outcome-list .address a",
+            );
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            return {
+              state,
+              width: innerWidth,
+              theme: document.documentElement.dataset.theme,
+              scroll: document.documentElement.scrollWidth,
+              name: element.textContent,
+              nameWidth: element.getBoundingClientRect().width,
+              nameScrollWidth: element.scrollWidth,
+              lines: range.getClientRects().length,
+              whiteSpace: getComputedStyle(element).whiteSpace,
+              overflowWrap: getComputedStyle(element).overflowWrap,
+              addressWhiteSpace: getComputedStyle(
+                document.querySelector("#contracts .address a"),
+              ).whiteSpace,
+            };
+          }, state);
+          report.measurements.push(measurement);
+          assert.equal(
+            measurement.scroll, width, `${state}: ${width}px ${theme} page overflow`,
+          );
+          assert.equal(
+            measurement.name, projectName, "the complete project name remains visible",
+          );
+          assert.ok(
+            measurement.nameScrollWidth <= Math.ceil(measurement.nameWidth),
+            "name stays within its box",
+          );
+          assert.equal(
+            measurement.addressWhiteSpace, "nowrap", "hex addresses retain compact formatting",
+          );
+          if (width <= 390)
+            assert.equal(measurement.lines, 2, "long names wrap into two lines on phones");
+          if (width === 360) {
+            await p.locator("#questions").scrollIntoViewIfNeeded();
+            await p.screenshot({
+              path: resolve(output, `questions-${state}-${width}-${theme}.png`),
+            });
+          }
+        }
+    };
+    await checkQuestionWidth("open");
+    await p.setViewportSize({ width: 390, height: 900 });
     await p.screenshot({
       path: resolve(output, "fork-application-390.png"),
       type: "png",
@@ -527,6 +583,7 @@ try {
           .innerText.includes("Question cleared without a decision"),
       "Expire clears the question and shows its outcome.",
     );
+    await checkQuestionWidth("outcome");
     for (const width of [360, 768, 1280])
       for (const theme of ["light", "dark"]) {
         await p.setViewportSize({ width, height: 900 });

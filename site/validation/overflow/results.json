@@ -1,0 +1,855 @@
+{
+  "finding": "2eea5bd6793f75042630339a806a12a7707d15764829f6cbe4ae83e280162767",
+  "browser": "Chrome for Testing 155.0.8059.12, Playwright 1.58.2",
+  "preview": "http://127.0.0.1:4175/preview/",
+  "before": {
+    "checkedAt": "2026-10-11T12:34:38.383Z",
+    "measurements": [
+      {
+        "state": "open",
+        "width": 360,
+        "theme": "light",
+        "scroll": 432,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 302,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "normal",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 360,
+        "theme": "dark",
+        "scroll": 432,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 302,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "normal",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 390,
+        "theme": "light",
+        "scroll": 432,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 332,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "normal",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 390,
+        "theme": "dark",
+        "scroll": 432,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 332,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "normal",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 768,
+        "theme": "light",
+        "scroll": 768,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 672.5625,
+        "nameScrollWidth": 673,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "normal",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 768,
+        "theme": "dark",
+        "scroll": 768,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 672.5625,
+        "nameScrollWidth": 673,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "normal",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 1280,
+        "theme": "light",
+        "scroll": 1280,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 415.984375,
+        "nameScrollWidth": 416,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "normal",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 1280,
+        "theme": "dark",
+        "scroll": 1280,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 415.984375,
+        "nameScrollWidth": 416,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "normal",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 360,
+        "theme": "light",
+        "scroll": 432,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "nowrap",
+        "overflowWrap": "break-word",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 360,
+        "theme": "dark",
+        "scroll": 432,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "nowrap",
+        "overflowWrap": "break-word",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 390,
+        "theme": "light",
+        "scroll": 432,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "nowrap",
+        "overflowWrap": "break-word",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 390,
+        "theme": "dark",
+        "scroll": 432,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "nowrap",
+        "overflowWrap": "break-word",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 768,
+        "theme": "light",
+        "scroll": 768,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "nowrap",
+        "overflowWrap": "break-word",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 768,
+        "theme": "dark",
+        "scroll": 768,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "nowrap",
+        "overflowWrap": "break-word",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 1280,
+        "theme": "light",
+        "scroll": 1280,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "nowrap",
+        "overflowWrap": "break-word",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 1280,
+        "theme": "dark",
+        "scroll": 1280,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "nowrap",
+        "overflowWrap": "break-word",
+        "addressWhiteSpace": "nowrap"
+      }
+    ],
+    "errors": []
+  },
+  "after": {
+    "mode": "fork",
+    "checkedAt": "2026-10-11T12:37:36.716Z",
+    "live": [],
+    "fork": [
+      "EIP-6963 selection and Sepolia switch passed.",
+      "Rejected signature has a plain per-button error.",
+      "Faucet minted 10,000 and refreshed balance.",
+      "Exact stake approval enables credit.",
+      "Credit updates cashback, vault value, project split and recent stacks.",
+      "Open mint supplies the separate oracle fee token.",
+      "Exact oracle fee approval enables application.",
+      "Application appears in open questions with project, asker and age.",
+      "The 15-second poll enables expiry after the live contract threshold, without a manual refresh.",
+      "Expire clears the question and shows its outcome.",
+      "Populated tables and wallet balances pass overflow and accessibility checks at 360, 768 and 1280 in both themes.",
+      "No live-chain writes were sent. Fork application uses an existing non-trading contract to exercise contract prechecks only.",
+      "All transaction gas limits equal the captured estimate multiplied by 1.3, rounded up."
+    ],
+    "errors": [],
+    "accessibility": [
+      {
+        "width": 360,
+        "theme": "light",
+        "route": "#/ (populated local fork)",
+        "violations": []
+      },
+      {
+        "width": 360,
+        "theme": "dark",
+        "route": "#/ (populated local fork)",
+        "violations": []
+      },
+      {
+        "width": 768,
+        "theme": "light",
+        "route": "#/ (populated local fork)",
+        "violations": []
+      },
+      {
+        "width": 768,
+        "theme": "dark",
+        "route": "#/ (populated local fork)",
+        "violations": []
+      },
+      {
+        "width": 1280,
+        "theme": "light",
+        "route": "#/ (populated local fork)",
+        "violations": []
+      },
+      {
+        "width": 1280,
+        "theme": "dark",
+        "route": "#/ (populated local fork)",
+        "violations": []
+      }
+    ],
+    "measurements": [
+      {
+        "state": "open",
+        "width": 360,
+        "theme": "light",
+        "scroll": 360,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 302,
+        "nameScrollWidth": 302,
+        "lines": 2,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 360,
+        "theme": "dark",
+        "scroll": 360,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 302,
+        "nameScrollWidth": 302,
+        "lines": 2,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 390,
+        "theme": "light",
+        "scroll": 390,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 332,
+        "nameScrollWidth": 332,
+        "lines": 2,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 390,
+        "theme": "dark",
+        "scroll": 390,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 332,
+        "nameScrollWidth": 332,
+        "lines": 2,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 768,
+        "theme": "light",
+        "scroll": 768,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 672.5625,
+        "nameScrollWidth": 673,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 768,
+        "theme": "dark",
+        "scroll": 768,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 672.5625,
+        "nameScrollWidth": 673,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 1280,
+        "theme": "light",
+        "scroll": 1280,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 415.984375,
+        "nameScrollWidth": 416,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "open",
+        "width": 1280,
+        "theme": "dark",
+        "scroll": 1280,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 415.984375,
+        "nameScrollWidth": 416,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 360,
+        "theme": "light",
+        "scroll": 360,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 302,
+        "nameScrollWidth": 302,
+        "lines": 2,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 360,
+        "theme": "dark",
+        "scroll": 360,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 302,
+        "nameScrollWidth": 302,
+        "lines": 2,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 390,
+        "theme": "light",
+        "scroll": 390,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 332,
+        "nameScrollWidth": 332,
+        "lines": 2,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 390,
+        "theme": "dark",
+        "scroll": 390,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 332,
+        "nameScrollWidth": 332,
+        "lines": 2,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 768,
+        "theme": "light",
+        "scroll": 768,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 768,
+        "theme": "dark",
+        "scroll": 768,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 1280,
+        "theme": "light",
+        "scroll": 1280,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      },
+      {
+        "state": "outcome",
+        "width": 1280,
+        "theme": "dark",
+        "scroll": 1280,
+        "name": "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUV",
+        "nameWidth": 403.203125,
+        "nameScrollWidth": 403,
+        "lines": 1,
+        "whiteSpace": "normal",
+        "overflowWrap": "anywhere",
+        "addressWhiteSpace": "nowrap"
+      }
+    ]
+  },
+  "live": {
+    "mode": "live",
+    "checkedAt": "2026-10-11T12:37:33.646Z",
+    "live": [
+      "Data at block 11,891,763\nRefresh",
+      "Docs anchor, llms.txt and copy agent guide passed.",
+      "Remembered theme, reduced motion and keyboard skip link exercised.",
+      "Keyboard tab navigation passed.",
+      "Read-error state disables writes, and Retry recovers live data."
+    ],
+    "fork": [],
+    "errors": [],
+    "accessibility": [
+      {
+        "width": 360,
+        "theme": "light",
+        "route": "#/",
+        "violations": []
+      },
+      {
+        "width": 360,
+        "theme": "light",
+        "route": "#/docs",
+        "violations": []
+      },
+      {
+        "width": 360,
+        "theme": "dark",
+        "route": "#/",
+        "violations": []
+      },
+      {
+        "width": 360,
+        "theme": "dark",
+        "route": "#/docs",
+        "violations": []
+      },
+      {
+        "width": 390,
+        "theme": "light",
+        "route": "#/",
+        "violations": []
+      },
+      {
+        "width": 390,
+        "theme": "light",
+        "route": "#/docs",
+        "violations": []
+      },
+      {
+        "width": 390,
+        "theme": "dark",
+        "route": "#/",
+        "violations": []
+      },
+      {
+        "width": 390,
+        "theme": "dark",
+        "route": "#/docs",
+        "violations": []
+      },
+      {
+        "width": 768,
+        "theme": "light",
+        "route": "#/",
+        "violations": []
+      },
+      {
+        "width": 768,
+        "theme": "light",
+        "route": "#/docs",
+        "violations": []
+      },
+      {
+        "width": 768,
+        "theme": "dark",
+        "route": "#/",
+        "violations": []
+      },
+      {
+        "width": 768,
+        "theme": "dark",
+        "route": "#/docs",
+        "violations": []
+      },
+      {
+        "width": 1280,
+        "theme": "light",
+        "route": "#/",
+        "violations": []
+      },
+      {
+        "width": 1280,
+        "theme": "light",
+        "route": "#/docs",
+        "violations": []
+      },
+      {
+        "width": 1280,
+        "theme": "dark",
+        "route": "#/",
+        "violations": []
+      },
+      {
+        "width": 1280,
+        "theme": "dark",
+        "route": "#/docs",
+        "violations": []
+      }
+    ],
+    "measurements": [
+      {
+        "route": "#/",
+        "width": 360,
+        "scroll": 360,
+        "theme": "light",
+        "headerHeight": 54,
+        "heading": "18px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 368.9375
+      },
+      {
+        "route": "#/docs",
+        "width": 360,
+        "scroll": 360,
+        "theme": "light",
+        "headerHeight": 54,
+        "heading": "18px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 0
+      },
+      {
+        "route": "#/",
+        "width": 360,
+        "scroll": 360,
+        "theme": "dark",
+        "headerHeight": 54,
+        "heading": "18px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 368.9375
+      },
+      {
+        "route": "#/docs",
+        "width": 360,
+        "scroll": 360,
+        "theme": "dark",
+        "headerHeight": 54,
+        "heading": "18px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 0
+      },
+      {
+        "route": "#/",
+        "width": 390,
+        "scroll": 390,
+        "theme": "light",
+        "headerHeight": 54,
+        "heading": "18px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 368.9375
+      },
+      {
+        "route": "#/docs",
+        "width": 390,
+        "scroll": 390,
+        "theme": "light",
+        "headerHeight": 54,
+        "heading": "18px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 0
+      },
+      {
+        "route": "#/",
+        "width": 390,
+        "scroll": 390,
+        "theme": "dark",
+        "headerHeight": 54,
+        "heading": "18px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 368.9375
+      },
+      {
+        "route": "#/docs",
+        "width": 390,
+        "scroll": 390,
+        "theme": "dark",
+        "headerHeight": 54,
+        "heading": "18px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 0
+      },
+      {
+        "route": "#/",
+        "width": 768,
+        "scroll": 768,
+        "theme": "light",
+        "headerHeight": 64,
+        "heading": "22px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 378.859375
+      },
+      {
+        "route": "#/docs",
+        "width": 768,
+        "scroll": 768,
+        "theme": "light",
+        "headerHeight": 64,
+        "heading": "22px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 0
+      },
+      {
+        "route": "#/",
+        "width": 768,
+        "scroll": 768,
+        "theme": "dark",
+        "headerHeight": 64,
+        "heading": "22px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 378.859375
+      },
+      {
+        "route": "#/docs",
+        "width": 768,
+        "scroll": 768,
+        "theme": "dark",
+        "headerHeight": 64,
+        "heading": "22px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 0
+      },
+      {
+        "route": "#/",
+        "width": 1280,
+        "scroll": 1280,
+        "theme": "light",
+        "headerHeight": 64,
+        "heading": "22px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 378.859375
+      },
+      {
+        "route": "#/docs",
+        "width": 1280,
+        "scroll": 1280,
+        "theme": "light",
+        "headerHeight": 64,
+        "heading": "22px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 0
+      },
+      {
+        "route": "#/",
+        "width": 1280,
+        "scroll": 1280,
+        "theme": "dark",
+        "headerHeight": 64,
+        "heading": "22px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 378.859375
+      },
+      {
+        "route": "#/docs",
+        "width": 1280,
+        "scroll": 1280,
+        "theme": "dark",
+        "headerHeight": 64,
+        "heading": "22px",
+        "fonts": [
+          "400:loaded",
+          "500:loaded",
+          "600:loaded"
+        ],
+        "connect": 0
+      }
+    ]
+  },
+  "impeccable": {
+    "source": [],
+    "page": [],
+    "mobile": [
+      {
+        "antipattern": "flat-type-hierarchy",
+        "name": "Flat type hierarchy",
+        "description": "Dominant heading and body roles are separated by less than 1.25\u00d7 at every step, leaving the size hierarchy flat. Add at least one stronger size step.",
+        "severity": "advisory",
+        "category": "slop",
+        "file": "http://127.0.0.1:4175/preview/",
+        "line": 0,
+        "snippet": "Role sizes: body 13px, h3 14px, h2 15px, h1 18px (largest adjacent step 1.20:1; target 1.25:1; weight separates headings from body text)",
+        "advisory": true,
+        "selector": "body"
+      },
+      {
+        "antipattern": "flat-type-hierarchy",
+        "name": "Flat type hierarchy",
+        "description": "Dominant heading and body roles are separated by less than 1.25\u00d7 at every step, leaving the size hierarchy flat. Add at least one stronger size step.",
+        "severity": "advisory",
+        "category": "slop",
+        "file": "http://127.0.0.1:4175/preview/#/docs",
+        "line": 0,
+        "snippet": "Role sizes: body 14px, h3 14px, h2 15px, h1 18px (largest adjacent step 1.20:1; target 1.25:1; weight separates headings from body text)",
+        "advisory": true,
+        "selector": "body"
+      }
+    ]
+  }
+}
