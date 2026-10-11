@@ -43,7 +43,9 @@ contract SepoliaForkTest is Test {
     function test_sepolia_liveFacts() public onlyFork {
         assertEq(SIMD.asset(), address(IMD));
         assertEq(SIMD.owner(), VAULT_OWNER);
-        assertEq(IMD.allowance(address(stacker), address(SIMD)), type(uint256).max);
+        assertEq(
+            IMD.allowance(address(stacker), address(SIMD)), 0, "approval deferred to first credit"
+        );
     }
 
     function test_sepolia_creditEventAndTotals() public onlyFork {

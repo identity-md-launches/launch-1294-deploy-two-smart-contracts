@@ -22,6 +22,7 @@ contract MintableIMD is ERC20 {
 contract MockIntake is IIntake {
     bytes32 public constant ACTION = "oracle.request@oracle-1";
     uint256 public constant PRICE = 0.5e18;
+    uint256 public price = PRICE;
     address public constant TREASURY = address(0x7EA5);
 
     struct Req {
@@ -40,6 +41,14 @@ contract MockIntake is IIntake {
     error ActionNotSold();
     error PriceNotMet();
 
+    function setPrice(uint256 amount) external {
+        price = amount;
+    }
+
+    function priceOf(bytes32 action, address) external view returns (uint256) {
+        return action == ACTION ? price : 0;
+    }
+
     function requestWithFailure(
         bytes32 action,
         bytes calldata body,
@@ -48,8 +57,8 @@ contract MockIntake is IIntake {
         address asset,
         uint256 amount
     ) external returns (bytes32 id) {
-        if (action != ACTION) revert ActionNotSold();
-        if (amount < PRICE) revert PriceNotMet();
+        if (action != ACTION || price == 0) revert ActionNotSold();
+        if (amount < price) revert PriceNotMet();
         IERC20(asset).transferFrom(msg.sender, TREASURY, amount);
         id = keccak256(abi.encode(address(this), ++count));
         _reqs[id] = Req(msg.sender, callback.target, callback.selector, onFailure, false, body);

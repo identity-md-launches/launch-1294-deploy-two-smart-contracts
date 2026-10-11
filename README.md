@@ -1,5 +1,7 @@
 # imd/acc
 
+**Launch adaptation:** see [ADAPTATION.md](ADAPTATION.md) for reproduced audit findings, fixes, tests and remaining release steps. The new static Sepolia page is in [site/](site/README.md); its contract addresses come only from the platform deployment handoff.
+
 **Trading cashback in staked IMD.** Every trade in a participating project sends part of the trade, between 0.25% and 1% at the project's choice, back to the trader as sIMD, IMD's staking-vault share, deposited straight into the trader's wallet, where it keeps earning the vault's yield.
 
 | | |
@@ -63,7 +65,7 @@ event Stacked(address indexed project, address indexed trader, uint256 imd, uint
 | Project | `msg.sender`. Any contract or wallet can call `credit`; [points](#points) decide who counts. |
 | Flow | Pulls `imdAmount` IMD from the caller, then calls `sIMD.deposit(imdAmount, trader)`. |
 | Holds nothing | 0 IMD and 0 sIMD between calls (tested as an invariant). |
-| Fixed | IMD and sIMD addresses are immutable; the constructor checks `sIMD.asset() == IMD` and approves the vault once. Both are skipped only where the vault has no code (IMD's empty-chain launch rehearsal); such a Stacker can't move any IMD. |
+| Fixed | IMD and sIMD addresses are immutable. The constructor makes no external calls. The first nonzero credit checks `sIMD.asset() == IMD` and approves the vault once; failure rolls everything back. |
 | Totals on chain | Per project (`projectStacked`, `projectShares`) and in total (`totalStacked`). |
 | Per trader | From the `Stacked` events, which record project, trader, IMD and shares for every credit. Storing them on chain too would cost every trader extra gas, so the mainnet Stacker doesn't. |
 | Failures | Reverts and moves nothing if the vault is paused, the allowance or balance is short, the trader is zero, or the vault would mint 0 shares. A 0 amount returns 0 with no event. |
@@ -177,7 +179,7 @@ src/oracle/               the oracle attestation verifier (EIP-712), shared with
 test/                     Foundry tests: unit, edge cases, fuzz, invariants, deployment, mainnet and Sepolia forks
   mocks/                  TestIMD, TestSIMD (a copy of StakedIMD), a mock Intake: test doubles only
 lib/                      forge-std, OpenZeppelin and Solady files, vendored
-launch.json               the IMD launch manifest: one Stacker, mainnet IMD and sIMD
+launch.json               supplied Sepolia manifest: Stacker then ProjectRegistry (unchanged)
 foundry.toml              solc 0.8.26, cancun, 10,000 optimizer runs, bytecode_hash none
 docs/
   listing.md              how a project gets listed: steps, checklist, fee guard, delisting
@@ -204,7 +206,7 @@ With [Foundry](https://getfoundry.sh) 1.8.3, the version IMD's verifier runs:
 
 ```
 forge build
-forge test                                                        # 68 tests; the 7 fork tests skip
+forge test                                                        # offline; optional fork tests skip
 ETH_RPC_URL=https://ethereum-rpc.publicnode.com forge test --mc MainnetFork            # live IMD and sIMD
 SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com forge test --mc SepoliaFork # live TestIMD and TestSIMD; RegistrySepoliaFork: the real Intake v2
 forge fmt --check src test

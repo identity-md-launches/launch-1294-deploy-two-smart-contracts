@@ -41,29 +41,32 @@ contract StackerTest is BaseTest {
 
     // ───────────────────────────── constructor ─────────────────────────────
 
-    function test_constructor_wiringAndOneTimeApproval() public view {
+    function test_constructor_wiringWithoutExternalCalls() public view {
         assertEq(address(stacker.IMD()), address(imd));
         assertEq(address(stacker.SIMD()), address(sImd));
-        assertEq(imd.allowance(address(stacker), address(sImd)), type(uint256).max);
+        assertEq(imd.allowance(address(stacker), address(sImd)), 0);
         assertEq(stacker.totalStacked(), 0);
     }
 
-    function test_constructor_revertsOnAssetMismatch() public {
+    function test_firstCredit_revertsOnAssetMismatch() public {
         TestIMD other = new TestIMD();
+        Stacker wrong = new Stacker(IERC20(address(other)), IStakedIMD(address(sImd)));
         vm.expectRevert(
             abi.encodeWithSelector(Stacker.AssetMismatch.selector, address(imd), address(other))
         );
-        new Stacker(IERC20(address(other)), IStakedIMD(address(sImd)));
+        wrong.credit(trader, 1e18);
+        assertEq(other.allowance(address(wrong), address(sImd)), 0);
+        assertEq(wrong.totalStacked(), 0);
     }
 
-    function test_constructor_vaultWithoutCode_skipsCheckAndApproval_creditCannotMove() public {
+    function test_constructor_vaultWithoutCode_creditCannotMove() public {
         // The launch rehearsal deploys on an empty chain: the vault address has no code there.
         address noVault = makeAddr("noVault");
         Stacker rehearsal = new Stacker(IERC20(address(imd)), IStakedIMD(noVault));
         assertEq(address(rehearsal.SIMD()), noVault);
         assertEq(imd.allowance(address(rehearsal), noVault), 0, "no approval without a vault");
 
-        // Such a Stacker can never take anyone's IMD: the deposit call reverts and unwinds the pull.
+        // The missing vault makes first-use validation revert before any tokens are pulled.
         vm.prank(project);
         imd.approve(address(rehearsal), type(uint256).max);
         vm.prank(project);
@@ -71,6 +74,56 @@ contract StackerTest is BaseTest {
         rehearsal.credit(trader, 1e18);
         assertEq(imd.balanceOf(project), 1_000_000e18, "nothing moved");
         assertEq(imd.balanceOf(address(rehearsal)), 0);
+    }
+
+    function test_constructor_doesNotCallExistingVaultOrToken() public {
+        vm.mockCallRevert(
+            address(sImd), abi.encodeWithSelector(IStakedIMD.asset.selector), "unavailable"
+        );
+        vm.mockCallRevert(
+            address(imd), abi.encodeWithSelector(IERC20.approve.selector), "unavailable"
+        );
+        Stacker cold = new Stacker(IERC20(address(imd)), IStakedIMD(address(sImd)));
+        assertEq(address(cold.SIMD()), address(sImd));
+        assertEq(cold.credit(trader, 0), 0, "zero credit does not initialize the vault");
+        assertEq(imd.allowance(address(cold), address(sImd)), 0);
+    }
+
+    function test_firstCredit_approvesOnce_andLaterCreditsStillWork() public {
+        vm.prank(project);
+        stacker.credit(trader, 1e18);
+        assertEq(imd.allowance(address(stacker), address(sImd)), type(uint256).max);
+        vm.mockCallRevert(
+            address(sImd), abi.encodeWithSelector(IStakedIMD.asset.selector), "checked once"
+        );
+        vm.mockCallRevert(
+            address(imd), abi.encodeWithSelector(IERC20.approve.selector), "approved once"
+        );
+        vm.prank(project);
+        stacker.credit(trader, 2e18);
+        assertEq(stacker.totalStacked(), 3e18);
+    }
+
+    function test_failedFirstCredit_rollsBackApprovalAndRetriesValidation() public {
+        vm.prank(OWNER);
+        sImd.setPaused(true);
+        vm.prank(project);
+        vm.expectRevert();
+        stacker.credit(trader, 1e18);
+        assertEq(imd.allowance(address(stacker), address(sImd)), 0);
+        vm.prank(OWNER);
+        sImd.setPaused(false);
+        vm.mockCall(
+            address(sImd), abi.encodeWithSelector(IStakedIMD.asset.selector), abi.encode(trader)
+        );
+        vm.prank(project);
+        vm.expectRevert(
+            abi.encodeWithSelector(Stacker.AssetMismatch.selector, trader, address(imd))
+        );
+        stacker.credit(trader, 1e18);
+        vm.clearMockedCalls();
+        vm.prank(project);
+        assertGt(stacker.credit(trader, 1e18), 0);
     }
 
     // ───────────────────────────── credit: success ─────────────────────────────

@@ -476,9 +476,10 @@ contract ProjectRegistryTest is RegistryBase {
         assertTrue(vm.contains(q, "[REASON]It credits the owner's wallet outside trades.[/REASON]"));
     }
 
-    function test_challenge_defended_bondToBeneficiary_newCooldown() public {
+    function test_challenge_defended_bondToBeneficiary_noNewCooldown() public {
         _listed();
         uint64 fromBlock = reg.projectOf(project).fromBlock;
+        uint64 openAt = reg.projectOf(project).challengeOpenAt;
         bytes32 id = _challenge();
         vm.expectEmit(true, false, false, false, address(reg));
         emit ProjectRegistry.Defended(project, 0, bytes32(0));
@@ -488,7 +489,7 @@ contract ProjectRegistryTest is RegistryBase {
         ProjectRegistry.Project memory p = reg.projectOf(project);
         assertTrue(p.listed);
         assertEq(p.fromBlock, fromBlock, "listing unchanged");
-        assertEq(p.challengeOpenAt, block.timestamp + COOLDOWN);
+        assertEq(p.challengeOpenAt, openAt, "a defended challenge grants no new immunity");
     }
 
     function test_challenge_lost_delistsFromThisBlock_bondBack() public {

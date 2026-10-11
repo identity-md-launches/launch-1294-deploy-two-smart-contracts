@@ -343,8 +343,8 @@ contract StackerInvariantExtendedTest is StdInvariant, BaseTest {
         assertEq(sImd.balanceOf(address(stacker)), 0, "stacker sIMD");
         assertEq(
             imd.allowance(address(stacker), address(sImd)),
-            type(uint256).max,
-            "one-time approval never consumed below max"
+            stacker.totalStacked() == 0 ? 0 : type(uint256).max,
+            "approval starts on the first successful credit"
         );
     }
 

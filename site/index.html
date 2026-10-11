@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Trading cashback, staked for you. Try imd/acc on Sepolia.">
+  <title>imd/acc · Sepolia lab</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <header class="shell topbar">
+    <a class="brand" href="#">imd<span>/</span>acc<span class="brand-dot">↗</span></a>
+    <div class="top-actions"><span class="network"><i></i> Sepolia lab</span><button id="theme" class="quiet" aria-label="Toggle light and dark theme">◐</button><button id="connect">Connect wallet</button></div>
+  </header>
+  <main class="shell">
+    <section class="hero">
+      <div><p class="eyebrow">SMALL TRADES. GROWING STACKS.</p><h1>Your cashback.<br><span>Already staked.</span></h1><p class="intro">Participating projects send 0.25–1% of each trade into your staking vault. Keep trading. Watch your stack grow.</p><a class="text-link" href="#try">Try it on Sepolia <span>↘</span></a></div>
+      <div class="stack-art" aria-hidden="true"><div class="art-grid"></div><div class="coin c1">IMD</div><div class="coin c2">IMD</div><div class="coin c3">sIMD ↗</div><span class="art-caption">TRADE → CASHBACK → STAKE</span></div>
+    </section>
+    <div class="notice" id="release-status" role="status">Loading the confirmed Sepolia release…</div>
+    <div class="section-title"><div><p class="eyebrow">YOUR WALLET</p><h2>The stack so far</h2></div><button id="refresh" class="quiet">Refresh ↻</button></div>
+    <p class="muted" id="wallet-status">Connect a wallet to see your cashback and vault balance.</p>
+    <div class="stats">
+      <article class="stat"><span>Cashback received</span><strong id="cashback">—</strong><small>Test IMD deposited for you</small></article>
+      <article class="stat"><span>Listing points</span><strong id="points">—</strong><small>1 point per eligible test IMD</small></article>
+      <article class="stat"><span>Cashback value now</span><strong id="value">—</strong><small id="yield">Priced by the live vault</small></article>
+      <article class="stat"><span>Vault shares held</span><strong id="held">—</strong><small>tsIMD in your wallet now</small></article>
+    </div>
+    <p class="fine">Cashback value prices all shares received through this Stacker, including shares later transferred or redeemed. Your current holdings are shown separately. Points are a test record, with no reward promised.</p>
+    <div id="wallet-projects" class="rows"></div>
+    <section id="try" class="two-col section-space">
+      <article class="panel"><p class="eyebrow">01 / TRY A STACK</p><h2>A little test IMD. A first stack.</h2><p>Get 10,000 test IMD from the faucet, then stake some for yourself. Direct stacks earn cashback shares, but no listing points.</p><p class="balance" id="staking-balance">Staking token balance —</p><button id="faucet" data-write disabled>Get staking test IMD</button><p id="faucet-next" class="fine">One faucet claim per wallet every 24 hours. Sepolia ETH is needed for gas.</p><output id="faucet-status" aria-live="polite"></output>
+      <form id="stack-form"><label for="stack-amount">Test IMD to stack</label><div class="input-action"><input id="stack-amount" name="amount" inputmode="decimal" autocomplete="off" placeholder="5" required><button data-write disabled>Stack to myself ↗</button></div><p class="fine">Approve the exact amount, then confirm the deposit in your wallet.</p><output id="stack-status" aria-live="polite"></output></form></article>
+      <article class="panel accented"><p class="eyebrow">02 / JOIN THE REGISTRY</p><h2>Projects earn their place.</h2><p>Anyone can apply or challenge a listing. An IdentityMD panel checks the project’s trading cashback, rate and fee rules.</p><div class="fee-line"><span>Oracle question</span><strong id="oracle-fee">—</strong></div><div class="fee-line"><span>Challenge bond</span><strong id="challenge-bond">—</strong></div><p class="fine">Registry fees use a different test token from the staking faucet. Mint it here and approve only the quoted amount when you submit.</p><button id="mint" data-write disabled>Get 10 oracle test IMD</button><p class="balance" id="oracle-balance">Oracle token balance —</p><output id="mint-status" aria-live="polite"></output><p class="fine">Answers usually arrive in minutes. A refusal or an unanswered question spends the fee. Challenge bonds return on delisting, failure or expiry; a defended bond goes to the project beneficiary.</p></article>
+    </section>
+    <section class="two-col">
+      <article class="panel"><h2>Apply for a listing</h2><form id="apply-form">
+        <label for="apply-project">Project contract</label><input id="apply-project" name="project" placeholder="0x…" required autocomplete="off" spellcheck="false">
+        <label for="apply-name">Project name</label><input id="apply-name" name="name" maxlength="48" required>
+        <label for="apply-url">Verified source URL</label><input id="apply-url" name="sourceUrl" type="url" placeholder="https://…" maxlength="200" required>
+        <div class="form-pair"><div><label for="apply-rate">Cashback rate</label><select id="apply-rate" name="rate"><option value="25">0.25%</option><option value="50" selected>0.50%</option><option value="75">0.75%</option><option value="100">1.00%</option></select></div><div><label for="apply-custom-rate">Or rate in bps (25–100)</label><input id="apply-custom-rate" name="customRate" type="number" min="25" max="100" step="1" placeholder="Optional"></div></div>
+        <label for="apply-beneficiary">Project beneficiary</label><input id="apply-beneficiary" name="beneficiary" placeholder="Team or treasury wallet, 0x…" required autocomplete="off" spellcheck="false">
+        <p class="fine">Use printable English text without quotes, backslashes or brackets. The panel checks that the beneficiary represents the project.</p><button data-write disabled>Approve fee & apply</button><output id="apply-status" aria-live="polite"></output>
+      </form></article>
+      <article class="panel"><h2>Challenge a listing</h2><form id="challenge-form">
+        <label for="challenge-project">Listed project</label><input id="challenge-project" name="project" placeholder="0x…" required autocomplete="off" spellcheck="false">
+        <label for="challenge-reason">What should the panel check?</label><textarea id="challenge-reason" name="reason" rows="5" maxlength="280" placeholder="Explain the rule violation and where to verify it." required></textarea><p class="fine">One question per project can be open. A new listing has a one-hour cooldown; a defended challenge does not restart it.</p><button data-write disabled>Approve fee + bond & challenge</button><output id="challenge-status" aria-live="polite"></output>
+      </form><div class="rule-note"><strong>The same rules for everyone.</strong><p>No owner or admin can list a project. Signed oracle answers decide. Applications are public, so another applicant may occupy a project’s pending slot.</p></div></article>
+    </section>
+    <section class="section-space"><div class="section-title"><div><p class="eyebrow">THE REGISTRY</p><h2>Trading projects</h2></div><span id="project-count" class="pill">— projects</span></div><div id="projects" class="project-grid"><p class="empty">Project listings appear after the release is confirmed.</p></div></section>
+    <section class="section-space"><div class="section-title"><div><p class="eyebrow">A LITTLE COMPETITION</p><h2>All-time leaderboards</h2></div></div><p class="fine">Listing points count Stacked events from a project’s listing block up to, but excluding, its delisting block. Direct and unlisted stacks get no points. These test totals do not independently verify each underlying trade or its rate.</p><div class="two-col"><article class="panel"><h3>Top stackers</h3><div id="trader-board" class="rows"><p class="empty">No confirmed data yet.</p></div></article><article class="panel"><h3>Top projects</h3><div id="project-board" class="rows"><p class="empty">No confirmed data yet.</p></div></article></div></section>
+    <section class="section-space"><h2>Freshly stacked</h2><div id="recent" class="rows"><p class="empty">The latest ten stacks will appear here.</p></div></section>
+    <section class="section-space panel"><div class="section-title"><h2>On Sepolia, in the open.</h2><span id="vault-status" class="pill">Vault —</span></div><p id="vault-totals" class="muted">The existing TestIMD faucet and TestSIMD vault are reused.</p><div id="contracts" class="contracts"></div><p class="fine" id="sync-status">Waiting for deployment confirmation. No wallet transactions are available yet.</p></section>
+  </main>
+  <footer class="shell"><a class="brand" href="#">imd<span>/</span>acc</a><p>Test tokens. Real contract behavior.<br>Sepolia only · No owner · No extra protocol fee</p><a href="https://github.com/khaed1/imd-acc/tree/sepolia" target="_blank" rel="noopener noreferrer">View source ↗</a></footer>
+</body>
+</html>

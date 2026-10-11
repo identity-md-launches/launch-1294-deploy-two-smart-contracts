@@ -14,6 +14,8 @@ interface IIntake {
         bytes4 selector;
     }
 
+    function priceOf(bytes32 action, address asset) external view returns (uint256);
+
     function requestWithFailure(
         bytes32 action,
         bytes calldata body,
@@ -77,8 +79,6 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
 
     /// @notice "oracle.request@oracle-1", right-padded: the action the Intake sells.
     bytes32 public constant ACTION = "oracle.request@oracle-1";
-    /// @notice The Intake's price for one oracle question.
-    uint256 public constant ORACLE_FEE = 0.5e18;
     /// @notice Seats on each panel, and how many must give the same answer.
     uint16 public constant PANEL_SIZE = 15;
     uint16 public constant QUORUM = 11;
@@ -106,7 +106,8 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
     /// @notice A challenger's deposit: paid to the project's beneficiary when the project stays
     /// listed, returned to the challenger when it is delisted or no answer comes.
     uint256 public immutable challengeBond;
-    /// @notice How long a project can't be challenged after it is listed or survives a challenge.
+    /// @notice How long a project can't be challenged after it is listed. Defending a challenge
+    /// does not restart this period, including when the challenger is the beneficiary's other wallet.
     uint64 public immutable challengeCooldown;
 
     mapping(address => Project) internal _projects;
@@ -157,6 +158,7 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
     error NothingToExpire();
     error NotStale();
     error NotBeneficiary();
+    error OracleUnavailable();
 
     /// @dev Makes no external call, so the launch's empty-chain rehearsal can deploy it.
     constructor(
@@ -179,6 +181,13 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
 
     // ================================================================ views
 
+    /// @notice The live price of an oracle question; zero means this action/asset is not sold.
+    /// @dev Keeps the original ORACLE_FEE() getter ABI. Callers should approve exactly this quote
+    /// (plus the bond for challenges), so a price increase before inclusion needs a new approval.
+    function ORACLE_FEE() public view returns (uint256) {
+        return intake.priceOf(ACTION, address(oracleAsset));
+    }
+
     function projectOf(address project) external view returns (Project memory) {
         return _projects[project];
     }
@@ -190,7 +199,7 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
     // ================================================================ asking
 
     /// @notice Apply for `project` to be listed at `rateBps` with `beneficiary` holding its points.
-    /// Anyone may apply; the caller pays the 0.5 IMD oracle fee. `name` is 1-48 bytes and `sourceUrl`
+    /// Anyone may apply; the caller pays the live oracle fee. `name` is 1-48 bytes and `sourceUrl`
     /// an https URL of at most 200 bytes, both printable ASCII without quotes, backslashes or
     /// square brackets. They go into the panel's question as untrusted text.
     function applyListing(
@@ -253,15 +262,17 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
         internal
         returns (bytes32 intakeId)
     {
-        oracleAsset.safeTransferFrom(msg.sender, address(this), ORACLE_FEE + bond);
-        oracleAsset.forceApprove(address(intake), ORACLE_FEE);
+        uint256 fee = ORACLE_FEE();
+        if (fee == 0) revert OracleUnavailable();
+        oracleAsset.safeTransferFrom(msg.sender, address(this), fee + bond);
+        oracleAsset.forceApprove(address(intake), fee);
         intakeId = intake.requestWithFailure(
             ACTION,
             bytes(body),
             IIntake.Callback({target: address(this), selector: this.onOracleResult.selector}),
             this.onOracleFailure.selector,
             address(oracleAsset),
-            ORACLE_FEE
+            fee
         );
         p.intakeId = intakeId;
         projectOfIntake[intakeId] = project;
@@ -290,7 +301,7 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
         }
         if (
             a.chainId != questionChainId || a.panelSize < PANEL_SIZE || a.quorum < QUORUM
-                || a.agreed < QUORUM
+                || a.agreed < QUORUM || a.agreed < a.quorum
         ) {
             revert WrongPanel();
         }
@@ -311,8 +322,8 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
                 emit Rejected(project, a.requestId);
             }
         } else if (yes) {
-            // The project still meets the rules: the bond goes to it, and it rests for a while.
-            p.challengeOpenAt = uint64(block.timestamp) + challengeCooldown;
+            // The bond still goes to the beneficiary. Do not let a beneficiary (or its other
+            // wallets) buy a fresh period of immunity by repeatedly defending its own challenge.
             if (challengeBond != 0) oracleAsset.safeTransfer(p.beneficiary, challengeBond);
             emit Defended(project, challengeBond, a.requestId);
         } else {

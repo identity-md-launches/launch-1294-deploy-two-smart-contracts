@@ -32,11 +32,11 @@ Anyone can call `credit` with their own IMD. That is just staking for someone, a
 
 | Step | Who | What happens |
 |---|---|---|
-| `applyListing(project, name, sourceUrl, rateBps, beneficiary)` | anyone | Pays the 0.5 IMD oracle fee and sends a yes-or-no question about the project. The project must be a contract, the rate 25-100 bps; name and URL are short printable ASCII (no quotes, backslashes or brackets) and go into the question as untrusted text. One open question per project at a time. |
+| `applyListing(project, name, sourceUrl, rateBps, beneficiary)` | anyone | Pays the live Intake oracle fee and sends a yes-or-no question about the project. The project must be a contract, the rate 25-100 bps; name and URL are short printable ASCII (no quotes, backslashes or brackets) and go into the question as untrusted text. One open question per project at a time. |
 | Signed **yes** | oracle panel | Listed from this block (`Listed`), with the stated rate and beneficiary. No challenge for `challengeCooldown`. |
 | Signed **no** | oracle panel | `Rejected`. The project can apply again. |
 | `challenge(project, reason)` | anyone | Only for a listed project, after its cooldown. Pays the oracle fee plus `challengeBond`. The panel is asked whether the project still meets every rule. |
-| Challenge, signed **yes** (still meets the rules) | oracle panel | Stays listed (`Defended`); **the bond goes to the project's beneficiary**; a new cooldown starts. |
+| Challenge, signed **yes** (still meets the rules) | oracle panel | Stays listed (`Defended`); **the bond goes to the project's beneficiary**; no new cooldown starts. |
 | Challenge, signed **no** | oracle panel | Delisted from this block (`Delisted`); **the bond goes back to the challenger**. Points before this block stay. The project can apply again later; a new listing starts a new period. |
 | No answer (refused or split panel) | Intake, through `onOracleFailure` | The open question is cleared (`AskCleared`) and a challenger's bond goes back. Nothing is listed or delisted. |
 | `expire(project)` | anyone | Clears an open question after a day, or at once if the Intake completed it without a settled answer (for example a callback that ran out of gas). A challenger's bond goes back. |
@@ -59,7 +59,7 @@ A challenge asks whether the listed project still meets all of them, with the ch
 1. It comes from the Intake, for a request this registry made and hasn't settled.
 2. It is signed by the oracle signer `0x5598…2982` in this contract's EIP-712 domain ("IdentityMD Oracle", version 2), and is not expired.
 3. It was issued after the question was asked, so an older answer can't be reused.
-4. It is filed under `questionChainId`, from a panel of at least 15 with at least 11 agreeing, and it is a bool.
+4. It is filed under `questionChainId`, from a panel of at least 15 with at least 11 agreeing and agreement meeting the signed quorum, and it is a bool.
 
 It does not pin the question's hash. Like PLEA's gate, it relies on the Intake pairing each answer with the right request, which is what IMD's docs recommend for a contract that asks on its own chain. Pinning the hash would mean rebuilding IMD's canonical JSON on chain, with a high cost if it is wrong by one byte.
 
@@ -70,7 +70,7 @@ Only the bonds of open challenges, never anything else, and never an approval le
 
 | Setting | Sepolia test run 2 | Mainnet |
 |---|---|---|
-| Oracle fee | 0.5 test IMD (anyone can mint it) | 0.5 IMD |
+| Oracle fee | Live `priceOf(ACTION, oracleAsset)`; 0.5 test IMD when checked | Live Intake price |
 | Challenge bond | 5 test IMD | to decide |
 | Challenge cooldown | 1 hour | to decide (for example 7 days) |
 | Panel | 15 seats, 11 agree | same |
@@ -78,7 +78,8 @@ Only the bonds of open challenges, never anything else, and never an approval le
 
 ### Known limits
 - **Blocking by spam:** someone can keep a project's application slot busy by applying for it with wrong terms, one question at a time. Each try costs them 0.5 IMD and lasts until the panel answers (minutes).
-- **Fixed oracle settings:** the signer, the action id (`oracle.request@oracle-1`) and the fee are fixed in the contract. If IMD changes them, a new registry is deployed, and the site reads both, so listing history is kept.
+- **Fixed oracle settings:** the signer, Intake, asset and action id (`oracle.request@oracle-1`) stay fixed to preserve the no-owner design. The fee now follows the live Intake price. Action retirement or signer rotation still requires a replacement registry. An indexer must end the old registry's eligibility at an explicit migration block; old listings must not remain permanently eligible just because they cannot be challenged. The static test page reads one confirmed release; cross-registry migration is a future release task.
+- **Challenge contention:** a defended challenge no longer restarts the cooldown, including for a beneficiary's other wallet. The one-open-question design still allows contention and repeated front-running while requests are open; this change does not promise fair ordering.
 - **Writer trust:** the Intake's writer can withhold an answer or pair one with the wrong request. That suits a listing decision, which can wait and be challenged.
 
 ### Tests
@@ -234,7 +235,7 @@ Side benefit: POOL4 burns a cut of IMD on its trades, so every flush also burns 
 - **Build:** an IMD `evm_contracts` launch, shipped before PLEA so PLEA could reuse its addresses.
 - **Points:** listed projects only, from their `fromBlock` (see above). 1 point per IMD stacked.
 - **Cashback rate:** 0.25% to 1% of each trade, chosen by each project and funded from its existing fees (was a fixed 0.5% until 2026-10-11; see above).
-- **Mainnet Stacker (2026-10-11):** the lean version in this repository: per-project totals on chain, per-trader figures from events. The constructor checks the vault and approves it only where the vault has code, so IMD's empty-chain rehearsal passes.
+- **Mainnet Stacker (2026-10-11):** the lean version in this repository: per-project totals on chain, per-trader figures from events. The constructor stores immutable addresses without external calls. The first nonzero credit validates and approves the vault, so the empty-chain rehearsal and the real deployment follow the same construction path.
 - **Dashboard (2026-10-11):** points, leaderboards and each trader's cashback, value and yield come from the events plus live vault reads, served by an indexer.
 - **ProjectRegistry (2026-10-11):** anyone may apply or challenge; one registry per chain; a defended challenge pays the bond to the project's beneficiary, a lost one returns it; no application fee beyond the oracle fee. First on Sepolia test run 2 with PLEA.
 - **Multichain (2026-10-11):** per-trader waiting balances on other chains, delivered to Ethereum through IMD's bridge, paid by a tip of up to 2% that rises over 12 hours.

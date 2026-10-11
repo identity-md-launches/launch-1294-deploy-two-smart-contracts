@@ -32,6 +32,7 @@ contract Stacker is ReentrancyGuard {
     IERC20 public immutable IMD;
     /// @notice The staked-IMD ERC-4626 vault that receives every deposit.
     IStakedIMD public immutable SIMD;
+    bool private _vaultReady;
 
     /// @notice IMD stacked by each project, across all traders.
     mapping(address => uint256) public projectStacked;
@@ -56,20 +57,11 @@ contract Stacker is ReentrancyGuard {
 
     /// @param imd The IMD token.
     /// @param sImd The staked-IMD vault; its `asset()` must equal `imd`.
-    /// @dev The launch rehearses every constructor on an empty chain, where the vault has no code.
-    /// There the asset check and the approval are skipped, so the rehearsal can pass. On any chain
-    /// where the vault exists, both always run. A Stacker deployed where the vault has no code cannot
-    /// credit anything: the deposit call reverts and nothing moves.
+    /// @dev No external calls: the factory also rehearses deployment on an empty chain. The first
+    /// non-zero credit checks the live vault and approves it before pulling any caller's tokens.
     constructor(IERC20 imd, IStakedIMD sImd) {
         IMD = imd;
         SIMD = sImd;
-        if (address(sImd).code.length != 0) {
-            address vaultAsset = sImd.asset();
-            if (vaultAsset != address(imd)) revert AssetMismatch(vaultAsset, address(imd));
-            // One-time approval. The Stacker never holds IMD between calls (see the invariant tests),
-            // so this allowance only ever covers the amount in flight inside a single `credit` call.
-            imd.forceApprove(address(sImd), type(uint256).max);
-        }
     }
 
     /// @notice Pull `imdAmount` IMD from the caller and stake it for `trader`; the sIMD shares are
@@ -83,6 +75,15 @@ contract Stacker is ReentrancyGuard {
     {
         if (trader == address(0)) revert ZeroTrader();
         if (imdAmount == 0) return 0;
+
+        if (!_vaultReady) {
+            address vaultAsset = SIMD.asset();
+            if (vaultAsset != address(IMD)) revert AssetMismatch(vaultAsset, address(IMD));
+            _vaultReady = true;
+            // Preserve the one-time approval to this immutable vault. Failed credits roll back
+            // both the approval and this flag, so validation is retried on the next credit.
+            IMD.forceApprove(address(SIMD), type(uint256).max);
+        }
 
         IMD.safeTransferFrom(msg.sender, address(this), imdAmount);
         shares = SIMD.deposit(imdAmount, trader);

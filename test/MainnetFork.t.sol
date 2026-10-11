@@ -54,9 +54,7 @@ contract MainnetForkTest is Test {
         assertFalse(vault.paused(), "vault open");
         assertEq(vault.decimals(), 24);
         assertEq(
-            IERC20(IMD).allowance(address(stacker), SIMD),
-            type(uint256).max,
-            "constructor approved the live vault"
+            IERC20(IMD).allowance(address(stacker), SIMD), 0, "approval deferred to first credit"
         );
     }
 
