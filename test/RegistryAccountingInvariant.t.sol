@@ -18,6 +18,7 @@ contract RegistryAccountingHandler is Test {
 
     struct Model {
         bool listed;
+        bool pinRequired;
         ProjectRegistry.Ask ask;
         address beneficiary;
         address asker;
@@ -54,6 +55,8 @@ contract RegistryAccountingHandler is Test {
     uint256 public expiries;
     uint256 public invalidAttempts;
     uint256 public retiredAttempts;
+    uint256 public lockedHandovers;
+    uint256 public unsafeChallengeAttempts;
 
     constructor(ProjectRegistry reg_, MockIntake intake_, MintableIMD imd_) {
         reg = reg_;
@@ -82,7 +85,7 @@ contract RegistryAccountingHandler is Test {
             vm.prank(actor);
             vm.expectRevert(ProjectRegistry.OracleUnavailable.selector);
             if (m.listed) {
-                reg.challenge(project, "Check the trading fees.");
+                reg.challengeForBeneficiary(project, "Check the trading fees.", m.beneficiary);
             } else {
                 reg.applyListing(
                     project, "Project", "https://example.org/source", rate, beneficiary
@@ -99,7 +102,7 @@ contract RegistryAccountingHandler is Test {
         imd.approve(address(reg), payment);
         bytes32 id;
         if (m.listed) {
-            id = reg.challenge(project, "Check the trading fees.");
+            id = reg.challengeForBeneficiary(project, "Check the trading fees.", m.beneficiary);
         } else {
             id = reg.applyListing(
                 project, "Project", "https://example.org/source", rate, beneficiary
@@ -210,8 +213,39 @@ contract RegistryAccountingHandler is Test {
         if (!m.listed) return;
         address next = actors[aSeed % ACTOR_COUNT];
         vm.prank(m.beneficiary);
+        if (m.ask != ProjectRegistry.Ask.None) {
+            vm.expectRevert(ProjectRegistry.AskOpen.selector);
+            reg.setBeneficiary(projects[pIndex], next);
+            lockedHandovers++;
+            return;
+        }
         reg.setBeneficiary(projects[pIndex], next);
+        if (next != m.beneficiary) m.pinRequired = true;
         m.beneficiary = next;
+    }
+
+    /// @dev Exercise rejected calls too: neither a stale pin nor the legacy API may buy a
+    /// question about an unintended wallet. The ledger and request model must stay unchanged.
+    function unsafeChallenge(uint256 pSeed, uint256 aSeed) external {
+        uint256 pIndex = pSeed % PROJECT_COUNT;
+        Model storage m = models[pIndex];
+        if (!m.listed || m.ask != ProjectRegistry.Ask.None) return;
+        if (block.timestamp < m.challengeOpenAt) vm.warp(m.challengeOpenAt);
+        address wrongBeneficiary = actors[0] == m.beneficiary ? actors[1] : actors[0];
+        vm.prank(actors[aSeed % ACTOR_COUNT]);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProjectRegistry.BeneficiaryChanged.selector, wrongBeneficiary, m.beneficiary
+            )
+        );
+        reg.challengeForBeneficiary(projects[pIndex], "Review this wallet.", wrongBeneficiary);
+        unsafeChallengeAttempts++;
+        if (m.pinRequired) {
+            vm.prank(actors[aSeed % ACTOR_COUNT]);
+            vm.expectRevert(ProjectRegistry.BeneficiaryPinRequired.selector);
+            reg.challenge(projects[pIndex], "Review this wallet.");
+            unsafeChallengeAttempts++;
+        }
     }
 
     function donate(uint256 aSeed, uint96 rawAmount) external {
@@ -239,7 +273,11 @@ contract RegistryAccountingHandler is Test {
         address outsider = actors[0] == m.beneficiary ? actors[1] : actors[0];
         vm.prank(outsider);
         vm.expectRevert(
-            m.listed ? ProjectRegistry.NotBeneficiary.selector : ProjectRegistry.NotListed.selector
+            !m.listed
+                ? ProjectRegistry.NotListed.selector
+                : m.ask != ProjectRegistry.Ask.None
+                    ? ProjectRegistry.AskOpen.selector
+                    : ProjectRegistry.NotBeneficiary.selector
         );
         reg.setBeneficiary(projects[pIndex], outsider);
         invalidAttempts++;
@@ -320,6 +358,9 @@ contract RegistryAccountingHandler is Test {
             assertEq(uint8(actual.ask), uint8(m.ask), "pending state");
             assertEq(actual.asker, m.asker, "payer retained until settlement");
             assertEq(actual.beneficiary, m.beneficiary, "beneficiary authorization");
+            assertEq(
+                reg.beneficiaryPinRequired(projects[i]), m.pinRequired, "handoff pin is permanent"
+            );
             assertEq(actual.rateBps, m.rate, "stated rate");
             assertEq(actual.askedAt, m.askedAt, "request timestamp");
             assertEq(actual.fromBlock, m.fromBlock, "listing start");
@@ -364,7 +405,7 @@ contract RegistryAccountingInvariantTest is StdInvariant, Test {
             1 hours
         );
         handler = new RegistryAccountingHandler(reg, intake, imd);
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](9);
         selectors[0] = handler.ask.selector;
         selectors[1] = handler.settle.selector;
         selectors[2] = handler.expire.selector;
@@ -373,6 +414,7 @@ contract RegistryAccountingInvariantTest is StdInvariant, Test {
         selectors[5] = handler.reprice.selector;
         selectors[6] = handler.passTime.selector;
         selectors[7] = handler.unauthorizedOrReplay.selector;
+        selectors[8] = handler.unsafeChallenge.selector;
         targetContract(address(handler));
         targetSelector(FuzzSelector(address(handler), selectors));
     }
@@ -404,8 +446,12 @@ contract RegistryAccountingInvariantTest is StdInvariant, Test {
         handler.settle(0, 0); // list
         _check();
         handler.ask(0, 2, 3, 50); // challenge; attempted new terms are irrelevant
-        handler.handOver(0, 4);
+        handler.handOver(0, 4); // must reject while the bond's recipient is locked
+        handler.unauthorizedOrReplay(0, 2); // AskOpen also precedes caller authorization
+        _check();
         handler.settle(0, 0); // defend: current beneficiary gets bond
+        _check();
+        handler.handOver(0, 4); // handoff becomes available after settlement
         _check();
         handler.ask(0, 4, 4, 50); // beneficiary can also be challenger
         handler.settle(0, 1); // delist: same actor gets refund
@@ -442,7 +488,42 @@ contract RegistryAccountingInvariantTest is StdInvariant, Test {
         assertEq(handler.failures(), 2);
         assertEq(handler.expiries(), 3);
         assertEq(handler.retiredAttempts(), 1);
-        assertEq(handler.invalidAttempts(), 6);
+        assertEq(handler.invalidAttempts(), 9);
+        assertEq(handler.lockedHandovers(), 1);
+        afterInvariant();
+    }
+
+    function test_handlerRetainsBeneficiaryPinAcrossHandoffsAndRelisting() public {
+        handler.ask(0, 0, 1, 50);
+        handler.settle(0, 0);
+        handler.handOver(0, 1); // a no-op is not a handoff
+        handler.unsafeChallenge(0, 2);
+        assertEq(handler.unsafeChallengeAttempts(), 1);
+        _check();
+
+        handler.handOver(0, 4);
+        handler.unsafeChallenge(0, 2);
+        _check();
+        handler.reprice(0);
+        handler.ask(0, 2, 0, 50); // pinned API still reports an unavailable oracle
+        assertEq(handler.retiredAttempts(), 1);
+        _check();
+        handler.reprice(0.5e18);
+        handler.handOver(0, 1); // restoring the original wallet cannot clear the pin
+        handler.unsafeChallenge(0, 2);
+        _check();
+
+        handler.ask(0, 2, 0, 50);
+        handler.settle(0, 1); // delist
+        _check();
+        handler.ask(0, 0, 1, 100);
+        handler.settle(0, 0); // relist with the original beneficiary
+        handler.unsafeChallenge(0, 2);
+        assertEq(handler.unsafeChallengeAttempts(), 7);
+        _check();
+        handler.ask(0, 2, 0, 50);
+        handler.settle(0, 0); // the pinned API remains usable
+        _check();
         afterInvariant();
     }
 

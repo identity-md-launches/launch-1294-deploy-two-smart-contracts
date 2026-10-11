@@ -18,6 +18,13 @@ A deterministic handler test exercises all payout outcomes and checks the model 
 transitions. The existing Stacker value-conservation invariants and protocol signature-vector
 tests remain in the suite.
 
+The accounting model also tracks beneficiary pinning independently across handoffs and
+relistings. Random calls attempt handoffs during open challenges, stale beneficiary pins,
+and legacy challenges after a handoff, checking the precise rejection and unchanged ledger.
+Deterministic campaigns cover returning to the original beneficiary and oracle retirement
+after a handoff. Settlement tests verify each defended bond reaches the beneficiary named
+when that challenge opened.
+
 Run the full local checks with:
 
 ```sh

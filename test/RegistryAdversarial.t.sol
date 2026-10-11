@@ -355,19 +355,33 @@ contract RegistryAdversarialTest is RegistryBase {
         reg.expire(project);
     }
 
-    function test_beneficiaryHandoverRevokesOldWalletDuringOpenChallenge() public {
+    function test_beneficiaryHandoverWaitsForSettlementAndRevokesOldWallet() public {
         _listed();
         bytes32 id = _challenge();
         address next = makeAddr("new beneficiary");
+        Snapshot memory before_ = _snapshot();
+        vm.prank(beneficiary);
+        vm.expectRevert(ProjectRegistry.AskOpen.selector);
+        reg.setBeneficiary(project, next);
+        _assertUnchanged(before_);
+        assertTrue(_answer(id, true));
+        assertEq(imd.balanceOf(beneficiary), BOND, "challenged beneficiary receives the bond");
+        assertEq(imd.balanceOf(next), 0);
+
         vm.prank(beneficiary);
         reg.setBeneficiary(project, next);
+        assertTrue(reg.beneficiaryPinRequired(project));
         vm.prank(beneficiary);
         vm.expectRevert(ProjectRegistry.NotBeneficiary.selector);
         reg.setBeneficiary(project, beneficiary);
+        assertEq(reg.projectOf(project).beneficiary, next);
+
+        vm.prank(challenger);
+        id = reg.challengeForBeneficiary(project, "Review the new beneficiary.", next);
         assertTrue(_answer(id, true));
         assertEq(imd.balanceOf(next), BOND);
-        assertEq(imd.balanceOf(beneficiary), 0);
-        assertEq(reg.projectOf(project).beneficiary, next);
+        assertEq(imd.balanceOf(beneficiary), BOND, "handoff cannot redirect an earlier bond");
+        assertEq(imd.balanceOf(address(reg)), 0);
     }
 
     function test_intakeRevertRollsBackFeeBondApprovalAndOpenRecord() public {
