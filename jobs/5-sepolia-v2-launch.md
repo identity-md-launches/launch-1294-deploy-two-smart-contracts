@@ -1,0 +1,12 @@
+Launch imd/acc's updated Stacker on Sepolia from this repository's sepolia branch: deploy only the Stacker, exactly as launch.json lists it, wired to the live TestIMD and TestSIMD of launch #1129. This is the second Sepolia test run: PLEA's next version will pay its cashback through this Stacker, and mainnet will use the same code from the main branch. imd/acc pays trading cashback to traders as staked IMD (sIMD), 0.25% to 1% of each trade at each project's choice, funded from the project's existing fees; the Stacker is the shared, ownerless funnel every project calls.
+
+DEPLOY (Sepolia, one contract):
+- Stacker(imd, sImd) with imd = 0x2b69099e59b05901faa1dd164fabf098bf831e82 (TestIMD; faucet() gives 10,000 tIMD per address per 24h) and sImd = 0xf9e2eec3b610ec6781f7438ac5fb4bc049d81cc1 (TestSIMD, a StakedIMD copy whose owner 0x4b91078b2374c956a65f7af0999cae0a935e6821 can pause it, so integrators can test their fallback). launch.json already lists exactly this. Both contracts are live; do not deploy new ones.
+- src/Stacker.sol stays as it is: no owner, admin, fee, pause or upgrade; immutable IMD and SIMD; credit(trader, imdAmount) pulls IMD from msg.sender and calls sIMD.deposit(imdAmount, trader); per-project totals and the grand total on chain; event Stacked(project, trader, imd, shares), from which per-trader figures and points are computed. The constructor checks sIMD.asset() == IMD and approves the vault once, only where the vault has code, so the empty-chain rehearsal passes; test/Deployment.t.sol covers both cases.
+- TestIMD and TestSIMD in test/mocks are test doubles of the live pair and are not deployed. Keep foundry.toml as it is (solc 0.8.26, cancun, 10,000 runs, bytecode_hash none).
+
+FACTS (read on chain 2026-10-11, Sepolia block 11,889,834): TestSIMD asset() = TestIMD, owner 0x4b91…6821, not paused. Sepolia now charges far more gas for new storage and code than mainnet: with the previous Stacker, a first credit to a new trader used 0.7M–1.2M gas. This build on a mainnet fork: deploy 446,090 gas, new trader 130,313, repeat 96,113.
+
+TESTS: forge test passes (42 tests). test/SepoliaFork.t.sol runs against the live TestIMD and TestSIMD when SEPOLIA_RPC_URL is set (a credit with its event and totals; a paused vault makes credit revert without moving anything); test/MainnetFork.t.sol runs against mainnet when ETH_RPC_URL is set. Both are skipped otherwise. Keep all of them passing.
+
+README: once live, add this Stacker's Sepolia address as "Sepolia test run 2" in the Deployments table, next to the launch #1129 contracts.

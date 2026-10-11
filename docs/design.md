@@ -42,6 +42,18 @@ What v1 does keep is a full **points record** from day one. Every `Stacked(proje
 
 This history drives the leaderboards. If imd/acc takes off, it's the basis for a later token, launched through the IMD swarm and **airdropped to early stackers and integrating projects**. Nothing is promised: points are a record, not a claim. A token would only make sense if imd/acc adds something for it to back, such as a small protocol cut, an integration-incentive budget, or a vote on featured projects.
 
+## Cashback rate: 0.25% to 1%, chosen by each project
+
+**Decided 2026-10-11** (it was a fixed 0.5%). Each project picks its rate between 0.25% and 1% of each trade. Lower lets projects with thin fees join; higher lets projects attract traders. PLEA uses 0.5%.
+
+- **No contract change.** The Stacker never checked the rate: it stakes whatever amount the project sends. The rate is a listing rule.
+- **Points stay "1 per IMD stacked".** A project with a higher rate gives its traders more cashback and so more points. Points stay tied to real IMD that reached traders, which is easy to verify for any kind of project.
+- **The guard against farming.** A project owner who trades with themselves gets back the cashback and their own share of the fee. So the part of the fee that really leaves the project (to liquidity providers, burns, prizes) must be at least as large as the cashback. Then farming points always costs more than it brings back. PLEA: 0.5% cashback, 0.75% to liquidity, burn and prizes.
+- **Listing.** Each listing states the rate (`rateBps`, 25 to 100). The listing check (the list file now, the ProjectRegistry panel later) reads the project's verified code to confirm the rate and the guard.
+- **Indexer.** It compares each credit with the swap in the same transaction and flags credits that don't match the stated rate; those earn no points.
+- **Dashboard.** Each project's rate is shown next to its name, so traders can compare.
+- **Gas.** At 0.25%, a credit's gas (about 2¢ for a new trader today) is outweighed by the cashback on trades above about $10, against $5 at 0.5%.
+
 ## Project points and the dashboard
 
 **Decided 2026-10-11.** Points and every dashboard figure come from the `Stacked` events. The mainnet Stacker stores only per-project totals on chain.
@@ -57,7 +69,7 @@ The only thing lost is that another contract can't ask the Stacker directly for 
 
 **Project points** are the IMD cashback a project paid its traders. It's real IMD that left the project, so it can't be faked cheaply. Rules for the indexer:
 - Count a project's credit only when the same transaction also has a swap on that project's pool, so a project can't credit its own wallets for points. Trading back and forth already costs more in fees than it earns.
-- Show next to it: unique traders, number of trades, estimated volume (cashback ÷ 0.5%), all-time, 7-day and 30-day.
+- Show next to it: the project's rate, unique traders, number of trades, estimated volume (cashback ÷ the project's rate), all-time, 7-day and 30-day.
 - Each listing carries a `beneficiary` wallet (in `projects.json` now, in the registry later), because the project address is a hook contract that can't receive an airdrop.
 
 **What a trader sees**, all from our site:
@@ -65,6 +77,8 @@ The only thing lost is that another contract can't ask the Stacker directly for 
 - sIMD held now: the vault's `balanceOf`, live;
 - what their cashback is worth today: the shares recorded in their events, priced by the vault's `convertToAssets`, live. This values only the cashback shares, even if they hold other sIMD;
 - earned on top: worth today − cashback received.
+
+**Where the list lives (2026-10-11, test run 2):** the new test page fetches `listings/sepolia.json` from this repository on GitHub (CORS is open), with a bundled copy as fallback. Each entry is `{address, name, fromBlock, rateBps, beneficiary}`. Listing a project is a commit, instead of a paid site job each time. The trust is the same as before (whoever controls the list); the ProjectRegistry replaces it later.
 
 **Indexer:** the test page scans events in the browser, which is fine for hundreds of events and too slow for thousands. IMD's `build-ponder-indexer` skill builds an indexer that keeps every chain's events in a table and serves the site. Order: mainnet Stacker, then the indexer, then the mainnet dashboard.
 
@@ -133,7 +147,7 @@ The only way out is to the StackReceiver, whose address is fixed at deploy. The 
 
 **Not built yet.** The first projects (PLEA, PondPad) collect their fees in IMD, so they can deposit straight into the vault. Projects paired with ETH, or with fees in ETH, use a batched route instead:
 
-1. **On each trade**, the hook takes the 0.5% in ETH and calls `creditETH(trader)`. The ETH is recorded as the trader's `pendingETH`. Nothing is swapped yet, so it costs little gas.
+1. **On each trade**, the hook takes its cashback in ETH and calls `creditETH(trader)`. The ETH is recorded as the trader's `pendingETH`. Nothing is swapped yet, so it costs little gas.
 2. **`flush()`** can be called by anyone, for a small tip like POOL4's keepers get. It:
    - swaps the pooled ETH to IMD in one trade through **POOL4**, IMD's main IMD/ETH pool
    - deposits that IMD into sIMD
@@ -156,7 +170,7 @@ Side benefit: POOL4 burns a cut of IMD on its trades, so every flush also burns 
 - **Gas:** v1 deposits on every credit. Batching comes in v2 with the ETH route.
 - **Build:** an IMD `evm_contracts` launch, shipped before PLEA so PLEA could reuse its addresses.
 - **Points:** listed projects only, from their `fromBlock` (see above). 1 point per IMD stacked.
-- **Cashback rate:** 0.5% of each trade, funded from the project's existing fees.
+- **Cashback rate:** 0.25% to 1% of each trade, chosen by each project and funded from its existing fees (was a fixed 0.5% until 2026-10-11; see above).
 - **Mainnet Stacker (2026-10-11):** the lean version in this repository: per-project totals on chain, per-trader figures from events. The constructor checks the vault and approves it only where the vault has code, so IMD's empty-chain rehearsal passes.
 - **Dashboard (2026-10-11):** points, leaderboards and each trader's cashback, value and yield come from the events plus live vault reads, served by an indexer.
 - **Multichain (2026-10-11):** per-trader waiting balances on other chains, delivered to Ethereum through IMD's bridge, paid by a tip of up to 2% that rises over 12 hours.
