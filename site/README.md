@@ -22,7 +22,7 @@ The live dependencies are fixed to the approved Sepolia table in `core.mjs`. New
 - Claim staking TestIMD with `faucet()`, view `nextFaucetAt`, approve exactly the amount entered, and call `credit(self, amount)`. This is direct staking and earns zero listing points.
 - Separately mint 10 **oracle** test IMD with `mint(self, 10e18)` on `0x44a1…f89a`. The staking token `0x2b69…1e82` cannot pay Intake fees.
 - Apply with project, name, HTTPS source URL, 25–100 bps and beneficiary. Read the current `ORACLE_FEE()`, approve exactly it, then submit.
-- Challenge with a reason and an exact fee-plus-bond approval. Listed status, open question and cooldown are checked first; the contracts remain authoritative if state changes while a wallet is open.
+- Challenge with a reason, the beneficiary being contested, and an exact fee-plus-bond approval. “Review this project” fills the beneficiary for review. The page calls `challengeForBeneficiary(project, reason, expectedBeneficiary)`: a different beneficiary before inclusion reverts before any fee or bond is pulled. It never silently replaces the user’s beneficiary choice. Listed status, open question and cooldown are checked first.
 - Clear an unanswered request once the Intake completed it or the one-day deadline passed.
 - Wallet and project totals, current vault balances/value, listing periods, all-time leaderboards, pending outcomes and recent stacks update on refresh or every 30 seconds. Transaction gas is the wallet estimate multiplied by 1.3.
 
@@ -32,7 +32,13 @@ All arithmetic uses `bigint`. Vault share decimals are read from the vault (24 o
 
 Logs are read in bounded chunks from each contract's confirmed deployment block, with endpoint failover and smaller ranges on RPC rejection. A failed or reorganized scan is visibly stale, never presented as a complete new leaderboard. Scans rebuild history, so removed logs are not retained in an incremental cache.
 
+The displayed rate is the historical application rate. Challenges check the rate currently in force within 25–100 bps and retain the fee guard; a lawful rate change alone does not delist a project.
+
 Each listing epoch is `[fromBlock, toBlock)`, or open-ended while listed. Previous eligible points survive delisting; relisting starts another epoch. Applications and challenges do not create eligibility themselves. Direct and unlisted stacks have no points. **This test page counts listing eligibility; it does not verify each project's swap logs, fee funding, or exact per-trade rate.** A production rewards indexer must add project-specific trade reconciliation. The page labels these as listing points and promises no rewards.
+
+The Stacker and registry have no owner, but the reused TestSIMD vault owner can pause deposits/withdrawals and sweep all staked test IMD. Any positive deposit to a trader, including a third-party dust deposit sent directly to the vault, stamps its one-block redemption hold. Repeated incoming deposits can delay exits; the page explains this beside the staking form.
+
+The registry blocks beneficiary transfers while a challenge is open. For API compatibility, `challenge(project, reason)` remains available only until the first actual beneficiary handoff; after one it always reverts `BeneficiaryPinRequired`, even if the old wallet is restored or the project relists. New integrations should always use `challengeForBeneficiary`.
 
 The single-open-request model permits spam and front-running. Defending a challenge no longer buys a new cooldown, but does not guarantee fair ordering. If Intake retires the action or the signer changes, a new registry and an explicit old-registry cutoff are needed; this page does not invent a migration rule.
 

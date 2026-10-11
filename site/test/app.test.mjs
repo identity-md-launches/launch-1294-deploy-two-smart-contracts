@@ -51,6 +51,10 @@ test('actual app DOM and wallet flows, offline', async t => {
   fixture = true;
   await import('../app.mjs?fixture');
   assert.ok($('release-status').textContent.includes('release connected'), $('release-status').textContent);
+  await t.test('staking flow explains the reused vault powers and third-party deposit hold', () => {
+    assert.match($('vault-trust').textContent, /owner can pause staking and withdrawals, or sweep all staked test IMD/);
+    assert.match($('vault-hold').textContent, /repeated deposits can keep delaying an exit/);
+  });
   await t.test('connect switches network and faucet targets the staking token', async () => {
     click('#connect'); await wait(() => $('wallet-status').textContent.includes('Connected on Sepolia') && !$('refresh').disabled);
     assert.equal(state.chain, '0xaa36a7');
@@ -77,12 +81,45 @@ test('actual app DOM and wallet flows, offline', async t => {
   await t.test('challenge approves fee plus bond and a completed question can expire', async () => {
     const p = state.projects.get(project); p[0] = 0n; p[1] = true; p[4] = BigInt(state.number); p[7] = 0n;
     addEvent(deployment.contracts[1].address, 'Listed', [project, 50, account, state.number, hash(44)]);
-    $('challenge-project').value = project; $('challenge-reason').value = 'It credits outside trades.';
+    $('challenge-project').value = project; $('challenge-beneficiary').value = account; $('challenge-reason').value = 'It credits outside trades.';
     submit('challenge-form'); await confirmed('challenge-status');
     assert.equal(state.txs.at(-2).args[1], 5500000000000000000n);
+    assert.equal(state.txs.at(-1).name, 'challengeForBeneficiary');
+    assert.equal(state.txs.at(-1).args[2].toLowerCase(), account);
     click('#projects button[data-write]');
     await wait(() => state.txs.at(-1).name === 'expire' && !$('connect').disabled);
     assert.equal(state.projects.get(project)[0], 0n);
+  });
+  await t.test('a changed beneficiary is refused before approval instead of silently replacing the user choice', async () => {
+    const p = state.projects.get(project), before = state.txs.length;
+    p[6] = '0x8888888888888888888888888888888888888888';
+    submit('challenge-form');
+    await wait(() => $('challenge-status').textContent.includes('The beneficiary changed.') && !$('connect').disabled);
+    assert.equal(state.txs.length, before);
+    assert.equal($('challenge-beneficiary').value, account);
+    p[6] = account;
+  });
+  await t.test('review action fills the beneficiary and displays the rate as historical', () => {
+    $('challenge-project').value = ''; $('challenge-beneficiary').value = '';
+    // Layout methods are supplied by browsers; this DOM-only fixture checks the form values.
+    $('challenge-form').scrollIntoView = () => {};
+    $('challenge-reason').focus = () => {};
+    const button = [...$('projects').querySelectorAll('button')].find(b => b.textContent === 'Review this project');
+    assert.ok(button);
+    button.dispatchEvent(new window.Event('click'));
+    assert.equal($('challenge-project').value.toLowerCase(), project);
+    assert.equal($('challenge-beneficiary').value.toLowerCase(), account);
+    assert.match($('projects').textContent, /cashback at application/);
+  });
+  await t.test('beneficiary changes during approval cannot redirect a challenge', async () => {
+    const p = state.projects.get(project), before = state.txs.filter(tx => tx.name === 'challengeForBeneficiary').length;
+    state.beneficiaryOnApproval = '0x8888888888888888888888888888888888888888';
+    submit('challenge-form');
+    await wait(() => $('challenge-status').textContent.includes('The beneficiary changed.') && !$('connect').disabled);
+    assert.equal(state.txs.filter(tx => tx.name === 'challengeForBeneficiary').length, before);
+    assert.equal(p[0], 0n);
+    assert.equal($('challenge-beneficiary').value, account);
+    state.beneficiaryOnApproval = undefined; p[6] = account;
   });
   await t.test('network changes between approval and deposit stop the flow', async () => {
     state.mutateOnApproval = true;

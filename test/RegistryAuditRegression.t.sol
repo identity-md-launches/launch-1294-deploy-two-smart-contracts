@@ -27,13 +27,16 @@ contract RegistryAuditRegressionTest is RegistryBase {
     function test_defendedChallengeFromAnotherWalletDoesNotRenewImmunity() public {
         _listed();
         uint64 openAt = reg.projectOf(project).challengeOpenAt;
-        bytes32 id = _challenge();
         vm.prank(beneficiary);
         reg.setBeneficiary(project, challenger);
+        vm.warp(block.timestamp + COOLDOWN);
+        vm.prank(challenger);
+        bytes32 id =
+            reg.challengeForBeneficiary(project, "Review after a beneficiary handoff.", challenger);
         assertTrue(_answer(id, true));
         assertEq(reg.projectOf(project).challengeOpenAt, openAt);
         vm.prank(applicant);
-        reg.challenge(project, "Another reason to review the project.");
+        reg.challengeForBeneficiary(project, "Another reason to review the project.", challenger);
     }
 
     function testFuzz_applicationPaysCurrentPrice(uint96 rawPrice) public {

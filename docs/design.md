@@ -35,33 +35,35 @@ Anyone can call `credit` with their own IMD. That is just staking for someone, a
 | `applyListing(project, name, sourceUrl, rateBps, beneficiary)` | anyone | Pays the live Intake oracle fee and sends a yes-or-no question about the project. The project must be a contract, the rate 25-100 bps; name and URL are short printable ASCII (no quotes, backslashes or brackets) and go into the question as untrusted text. One open question per project at a time. |
 | Signed **yes** | oracle panel | Listed from this block (`Listed`), with the stated rate and beneficiary. No challenge for `challengeCooldown`. |
 | Signed **no** | oracle panel | `Rejected`. The project can apply again. |
-| `challenge(project, reason)` | anyone | Only for a listed project, after its cooldown. Pays the oracle fee plus `challengeBond`. The panel is asked whether the project still meets every rule. |
+| `challengeForBeneficiary(project, reason, expectedBeneficiary)` | anyone | Only for a listed project, after its cooldown. Checks the beneficiary against the caller’s expected wallet before paying the live oracle fee plus `challengeBond`. The panel is asked whether the project still meets every rule. |
 | Challenge, signed **yes** (still meets the rules) | oracle panel | Stays listed (`Defended`); **the bond goes to the project's beneficiary**; no new cooldown starts. |
 | Challenge, signed **no** | oracle panel | Delisted from this block (`Delisted`); **the bond goes back to the challenger**. Points before this block stay. The project can apply again later; a new listing starts a new period. |
 | No answer (refused or split panel) | Intake, through `onOracleFailure` | The open question is cleared (`AskCleared`) and a challenger's bond goes back. Nothing is listed or delisted. |
 | `expire(project)` | anyone | Clears an open question after a day, or at once if the Intake completed it without a settled answer (for example a callback that ran out of gas). A challenger's bond goes back. |
-| `setBeneficiary(project, wallet)` | the current beneficiary | Hands a listed project's points to another wallet. |
+| `setBeneficiary(project, wallet)` | the current beneficiary | Hands a listed project's points to another wallet only when no question is open. |
+
+The legacy `challenge(project, reason)` works only until the first actual beneficiary handoff. A handoff permanently requires the pinned function, including after restoration or relisting, so front-running a legacy challenge cannot replace its terms and charge its caller. The website always uses the pinned function.
 
 ### What the panel is asked
 
 The question names the Stacker, the project, the chain and the registry, the stated rate and beneficiary, and the applicant's name and URL as untrusted text. It asks for **true only if every rule holds**, judged from the verified source and on-chain state:
 - **trading:** a trading venue that calls `credit` only while executing a trade, for that trade's trader, with IMD from that trade's fees;
-- **rate:** the stated rate, between 25 and 100 bps, and if the rate can change, the code keeps it in that range;
+- **rate:** an application verifies the stated current rate, between 25 and 100 bps; a challenge verifies the current rate is in that range and the code keeps any adjustable rate there. The recorded application rate is historical, so a valid change alone does not fail a challenge;
 - **feeGuard:** the parts of the fee that leave for good are at least the cashback;
 - **beneficiary:** the project's owner, or a wallet its verified source or official website names as its team or treasury. This stops someone from applying for another team's project with their own wallet as beneficiary;
 - **evidence:** the verified source on the chain's explorer; unverified code means false.
 
-A challenge asks whether the listed project still meets all of them, with the challenger's reason as untrusted text. Panel: 15 seats, 11 must agree. IMD's free check accepted this question (no blockers, judged answerable).
+A challenge asks whether the listed project still meets all of them, with the challenger's reason as untrusted text. Panel: 15 seats, 11 must agree. The original question passed IMD's free wording check; an end-to-end response to the revised exact body remains a platform release smoke check.
 
 **Filed under chain 1.** The oracle has no Sepolia RPC (its check refuses chain 11155111), so Sepolia questions are filed under chain 1, like PLEA's gate does, and the text names Sepolia. The registry's `questionChainId` is 1 on Sepolia and mainnet; it would be 4663 on Robinhood Chain.
 
 ### What an answer must pass
 1. It comes from the Intake, for a request this registry made and hasn't settled.
 2. It is signed by the oracle signer `0x5598…2982` in this contract's EIP-712 domain ("IdentityMD Oracle", version 2), and is not expired.
-3. It was issued after the question was asked, so an older answer can't be reused.
+3. Its issue time is no earlier than five minutes before the ask (clock tolerance), and its signed oracle UUID has not been consumed. Every settled yes or no consumes that UUID across all requests.
 4. It is filed under `questionChainId`, from a panel of at least 15 with at least 11 agreeing and agreement meeting the signed quorum, and it is a bool.
 
-It does not pin the question's hash. Like PLEA's gate, it relies on the Intake pairing each answer with the right request, which is what IMD's docs recommend for a contract that asks on its own chain. Pinning the hash would mean rebuilding IMD's canonical JSON on chain, with a high cost if it is wrong by one byte.
+It does not pin the question's hash. Like PLEA's gate, it relies on the Intake pairing each answer with the right request, which is what IMD's docs recommend for a contract that asks on its own chain. The relative block window resolves off chain, so its hash is not available when asking. UUID consumption prevents repeated use, but a first-use mispairing still relies on the trusted writer.
 
 ### Money it holds
 Only the bonds of open challenges, never anything else, and never an approval left to the Intake (each ask approves exactly the fee, which the Intake takes at once). A failure or an expiry returns a bond to the challenger who paid it. That is the only value an unsigned failure moves, and it gives the Intake's writer no power it doesn't already have: withholding an answer leads to the same refund through `expire`.
@@ -75,6 +77,8 @@ Only the bonds of open challenges, never anything else, and never an approval le
 | Challenge cooldown | 1 hour | to decide (for example 7 days) |
 | Panel | 15 seats, 11 agree | same |
 | Open question expires | after 1 day | same |
+
+Constructor cooldowns above 365 days are refused before deployment; the Sepolia launch remains at one hour.
 
 ### Known limits
 - **Blocking by spam:** someone can keep a project's application slot busy by applying for it with wrong terms, one question at a time. Each try costs them 0.5 IMD and lasts until the panel answers (minutes).
@@ -114,8 +118,8 @@ This history drives the leaderboards. If imd/acc takes off, it's the basis for a
 - **Points stay "1 per IMD stacked".** A project with a higher rate gives its traders more cashback and so more points. Points stay tied to real IMD that reached traders, which is easy to verify for any kind of project.
 - **The guard against farming.** A project owner who trades with themselves gets back the cashback and their own share of the fee. So the part of the fee that really leaves the project (to liquidity providers, burns, prizes) must be at least as large as the cashback. Then farming points always costs more than it brings back. PLEA: 0.5% cashback, 0.75% to liquidity, burn and prizes.
 - **Listing.** Each listing states the rate (`rateBps`, 25 to 100). The listing check (the list file now, the ProjectRegistry panel later) reads the project's verified code to confirm the rate and the guard.
-- **Indexer.** It compares each credit with the swap in the same transaction and flags credits that don't match the stated rate; those earn no points.
-- **Dashboard.** Each project's rate is shown next to its name, so traders can compare.
+- **Indexer.** It compares each credit with the swap in the same transaction and flags credits that don't match the rate in force for that trade; those earn no points.
+- **Dashboard.** The test page shows the historical application rate next to each project; a live rate requires project-specific reads.
 - **Gas.** At 0.25%, a credit's gas (about 2¢ for a new trader today) is outweighed by the cashback on trades above about $10, against $5 at 0.5%.
 
 ## Project points and the dashboard

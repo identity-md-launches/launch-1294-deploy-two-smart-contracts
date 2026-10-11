@@ -84,7 +84,7 @@ try {
   assert.equal(await evaluate("document.querySelector('#projects img') === null"), true, 'untrusted names are text');
   const p = state.projects.get(project); p[0] = 0n; p[1] = true; p[4] = BigInt(state.number); p[7] = 0n;
   addEvent(deployment.contracts[1].address, 'Listed', [project, 50, account, state.number, hash(44)]);
-  await evaluate(`document.getElementById('challenge-project').value='${project}';document.getElementById('challenge-reason').value='It credits outside trades.'`);
+  await evaluate(`document.getElementById('challenge-project').value='${project}';document.getElementById('challenge-beneficiary').value='${account}';document.getElementById('challenge-reason').value='It credits outside trades.'`);
   await clickAndWait('#challenge-form button', 'challenge-status');
   await evaluate("document.querySelector('#projects button[data-write]').click()");
   await wait("!document.getElementById('connect').disabled && !document.querySelector('#projects button[data-write]')");

@@ -23,6 +23,9 @@ function controls() {
 function status(id, message, error = false) { text(id, message); $(id).classList.toggle('error', error); }
 function describeError(e) {
   if (e.code === 4001 || e.code === 'ACTION_REJECTED') return 'Wallet request cancelled. You can try again.';
+  let registryError;
+  try { registryError = registryInterface.parseError(e.data)?.name; } catch {}
+  if (e.revert?.name === 'BeneficiaryChanged' || registryError === 'BeneficiaryChanged') return 'The beneficiary changed. Review the project and the beneficiary you intend to challenge before submitting again.';
   return e.reason || e.shortMessage || e.message || 'The request did not complete.';
 }
 function clearWalletView() {
@@ -154,7 +157,7 @@ async function renderProjects(summary, block, timestamp) {
     projectStates.set(key(p.address), p.state);
     const card = el('article', undefined, 'project-card');
     card.append(el('span', p.state.ask === 1n ? 'Application pending' : p.state.ask === 2n ? 'Challenge pending' : p.state.listed ? 'Listed' : p.outcome, 'pill'), el('h3', p.name), link(p.address));
-    card.append(el('p', `${Number(p.state.rateBps) / 100}% cashback · beneficiary ${short(p.state.beneficiary)}`));
+    card.append(el('p', `${Number(p.state.rateBps) / 100}% cashback at application · beneficiary ${short(p.state.beneficiary)}`));
     if (p.periods.length) card.append(el('p', `Listing blocks · ${p.periods.map(period => `${period.from} → ${period.to === Infinity ? 'ongoing' : `${period.to} (exclusive)`}`).join(', ')}`));
     if (p.state.ask !== 0n) {
       card.append(el('p', `Waiting ${Math.max(0, Math.floor((timestamp - Number(p.state.askedAt)) / 60))} minutes for an oracle result. Public expiry after ${new Date((Number(p.state.askedAt) + 86400) * 1000).toLocaleString()}, or once the Intake has completed.`));
@@ -164,7 +167,7 @@ async function renderProjects(summary, block, timestamp) {
       card.append(button, output);
     } else if (p.state.listed) {
       if (BigInt(timestamp) < p.state.challengeOpenAt) card.append(el('p', `Challenges open ${new Date(Number(p.state.challengeOpenAt) * 1000).toLocaleString()}`));
-      const button = el('button', 'Review this project'); button.addEventListener('click', () => { $('challenge-project').value = p.address; $('challenge-reason').focus(); $('challenge-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); }); card.append(button);
+      const button = el('button', 'Review this project'); button.addEventListener('click', () => { $('challenge-project').value = p.address; $('challenge-beneficiary').value = p.state.beneficiary; $('challenge-reason').focus(); $('challenge-form').scrollIntoView({ behavior: 'smooth', block: 'center' }); }); card.append(button);
     }
     $('projects').append(card);
   }
@@ -240,6 +243,7 @@ $('challenge-form').addEventListener('submit', e => {
   const f = new FormData(e.target);
   e.preventDefault(); action(e.submitter, 'challenge-status', async signer => {
     const project = address(f.get('project')), reason = checkedText(f.get('reason'), 1, 280, 'Reason');
+    const beneficiary = address(f.get('beneficiary'));
     const [state, fee, bond, block] = await Promise.all([
       rpc.read(deployment.ProjectRegistry, REGISTRY_ABI, 'projectOf', [project]),
       rpc.read(deployment.ProjectRegistry, REGISTRY_ABI, 'ORACLE_FEE'),
@@ -247,11 +251,12 @@ $('challenge-form').addEventListener('submit', e => {
       rpc.request('eth_getBlockByNumber', ['latest', false]),
     ]);
     if (!state.listed) throw new Error('This project is not listed.');
+    if (key(state.beneficiary) !== key(beneficiary)) throw new Error('The beneficiary changed. Review the project and the beneficiary you intend to challenge before submitting again.');
     if (state.ask !== 0n) throw new Error('This project already has an open question.');
     if (BigInt(block.timestamp) < state.challengeOpenAt) throw new Error(`Challenges open ${new Date(Number(state.challengeOpenAt) * 1000).toLocaleString()}.`);
     if (fee === 0n) throw new Error('The oracle action is not currently sold.');
     await approve(signer, ADDRESSES.OracleIMD, deployment.ProjectRegistry, fee + bond, 'challenge-status');
-    await send(signer, deployment.ProjectRegistry, REGISTRY_ABI, 'challenge', [project, reason], 'challenge-status', 'Submit challenge');
+    await send(signer, deployment.ProjectRegistry, REGISTRY_ABI, 'challengeForBeneficiary', [project, reason, beneficiary], 'challenge-status', 'Submit challenge');
   });
 });
 if (window.ethereum?.on) {

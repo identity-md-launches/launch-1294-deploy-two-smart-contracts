@@ -73,11 +73,11 @@ A normal trader can't farm points: they pay the whole fee and get back only the 
 
 ### Delisting
 
-If a listed project breaks the rules (changes its rate, fails the guard, credits its own wallets), its entry gets a `toBlock`. Points earned before it stay; later credits earn none. The entry is never deleted, so history stays readable.
+If a listed project breaks the rules (moves its rate outside 25–100 bps, fails the guard, credits its own wallets), its entry gets a `toBlock`. Points earned before it stay; later credits earn none. The entry is never deleted, so history stays readable.
 
 ### Every credit is checked too
 
-The indexer compares each credit with the trade in the same transaction. A credit at a rate other than `rateBps`, or with no trade on the project's pool in that transaction, earns no points.
+The indexer compares each credit with the trade in the same transaction. A credit that does not match the rate in force for that trade, or with no trade on the project's pool in that transaction, earns no points.
 
 ### Who decides the file
 
@@ -90,7 +90,7 @@ A small on-chain contract with **no owner** ([`src/ProjectRegistry.sol`](../src/
 1. **Apply.** Anyone calls `applyListing(project, name, sourceUrl, rateBps, beneficiary)` and pays the 0.5 IMD oracle fee. The project must be a contract; the rate 25 to 100.
 2. **The panel answers** in a few minutes: true only if every rule on the checklist holds, including the fee guard and that the beneficiary belongs to the project's team. **Yes** lists the project from that block; **no** rejects it, and it can apply again.
 3. **No answer** (the panel split or the question was refused): the application is cleared and can be sent again at once. Nothing is listed.
-4. **Challenge.** Anyone can challenge a listed project, after a cooldown, by paying the oracle fee plus a bond. If the panel says it still meets the rules, it stays listed and **the bond goes to the project's beneficiary**; if not, it is delisted from that block, earlier points stay, and the challenger gets the bond back.
+4. **Challenge.** Anyone calls `challengeForBeneficiary(project, reason, expectedBeneficiary)` (or uses the test page), after the listing cooldown, paying the live oracle fee plus a bond. A beneficiary change before inclusion reverts before payment; it cannot change while the question is open. The legacy two-argument call is unavailable after any beneficiary handoff. The panel checks the current rate within 25–100 bps; the recorded application rate is historical. If the panel says it still meets the rules, it stays listed and **the bond goes to the project's beneficiary**; if not, it is delisted from that block, earlier points stay, and the challenger gets the bond back.
 5. **Points** count a project's credits inside its listing periods only.
 
 The full design, the checks every answer must pass, and the known limits are in [design.md](design.md#the-projectregistry).

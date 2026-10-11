@@ -64,7 +64,7 @@ contract RegistryHandler is Test {
         if (!s.listed || s.ask != ProjectRegistry.Ask.None) return;
         if (block.timestamp < s.challengeOpenAt) vm.warp(s.challengeOpenAt);
         vm.prank(actors[aSeed % actors.length]);
-        reg.challenge(p, "It breaks the fee guard.");
+        reg.challengeForBeneficiary(p, "It breaks the fee guard.", s.beneficiary);
     }
 
     function answer(uint256 pSeed, bool yes) external {
@@ -133,7 +133,7 @@ contract RegistryHandler is Test {
     function handOver(uint256 pSeed, uint256 aSeed) external {
         address p = projects[pSeed % projects.length];
         ProjectRegistry.Project memory s = reg.projectOf(p);
-        if (!s.listed) return;
+        if (!s.listed || s.ask != ProjectRegistry.Ask.None) return;
         vm.prank(s.beneficiary);
         reg.setBeneficiary(p, actors[aSeed % actors.length]);
     }

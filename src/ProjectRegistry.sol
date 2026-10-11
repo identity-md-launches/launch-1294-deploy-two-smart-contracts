@@ -64,7 +64,7 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
         // slot 0
         Ask ask; // the open question, if any
         bool listed;
-        uint16 rateBps; // cashback rate in basis points (the stated one while an application is open)
+        uint16 rateBps; // rate stated at application; challenges check the current rate's allowed range
         uint64 askedAt; // when the open question was asked
         uint64 fromBlock; // first block of the current or last listing
         uint64 toBlock; // block the last listing ended; 0 while listed
@@ -87,6 +87,9 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
     uint16 public constant MAX_RATE_BPS = 100;
     /// @notice After this long, an open question with no settled answer can be cleared by anyone.
     uint64 public constant PENDING_EXPIRY = 1 days;
+    /// @notice Reject deployment inputs that could overflow the listing deadline or lock out
+    /// challenges for an impractical period. The Sepolia launch uses one hour.
+    uint64 public constant MAX_CHALLENGE_COOLDOWN = 365 days;
     /// @notice Text limits, in bytes.
     uint256 public constant MAX_NAME = 48;
     uint256 public constant MAX_URL = 200;
@@ -113,6 +116,9 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
     mapping(address => Project) internal _projects;
     /// @notice The project an open Intake request is about.
     mapping(bytes32 => address) public projectOfIntake;
+    /// @notice After a beneficiary handoff, challenges must explicitly pin the intended wallet.
+    /// This stays true across relistings so restoring an old wallet cannot revive an unsafe call.
+    mapping(address => bool) public beneficiaryPinRequired;
 
     event Applied(
         address indexed project,
@@ -159,6 +165,9 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
     error NotStale();
     error NotBeneficiary();
     error OracleUnavailable();
+    error BeneficiaryChanged(address expected, address actual);
+    error BeneficiaryPinRequired();
+    error CooldownOutOfRange();
 
     /// @dev Makes no external call, so the launch's empty-chain rehearsal can deploy it.
     constructor(
@@ -171,6 +180,7 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
         uint64 challengeCooldown_
     ) OracleAttestationConsumer(oracleSigner_) {
         if (intake_ == address(0) || oracleAsset_ == address(0) || stacker_ == address(0)) revert ZeroAddress();
+        if (challengeCooldown_ > MAX_CHALLENGE_COOLDOWN) revert CooldownOutOfRange();
         intake = IIntake(intake_);
         oracleAsset = IERC20(oracleAsset_);
         stacker = stacker_;
@@ -233,9 +243,29 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
     /// @notice Challenge a listed `project`: ask the panel whether it still meets every rule. The
     /// caller pays the oracle fee plus `challengeBond`. `reason` is 1-280 bytes of printable ASCII
     /// without quotes, backslashes or square brackets.
+    /// @dev Compatibility entry point, available only until the project's first beneficiary
+    /// handoff. Use `challengeForBeneficiary` for every project that has had a handoff.
     function challenge(address project, string calldata reason)
         external
         nonReentrant
+        returns (bytes32 intakeId)
+    {
+        if (beneficiaryPinRequired[project]) revert BeneficiaryPinRequired();
+        return _challenge(project, reason, _projects[project].beneficiary);
+    }
+
+    /// @notice Challenge the stated beneficiary. If it changes before inclusion, revert before
+    /// paying the oracle fee or bond instead of asking about a different wallet.
+    function challengeForBeneficiary(
+        address project,
+        string calldata reason,
+        address expectedBeneficiary
+    ) external nonReentrant returns (bytes32 intakeId) {
+        return _challenge(project, reason, expectedBeneficiary);
+    }
+
+    function _challenge(address project, string calldata reason, address expectedBeneficiary)
+        internal
         returns (bytes32 intakeId)
     {
         _checkText(bytes(reason), 1, MAX_REASON);
@@ -243,6 +273,9 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
         if (!p.listed) revert NotListed();
         if (p.ask != Ask.None) revert AskOpen();
         if (block.timestamp < p.challengeOpenAt) revert ChallengeTooSoon(p.challengeOpenAt);
+        if (p.beneficiary != expectedBeneficiary) {
+            revert BeneficiaryChanged(expectedBeneficiary, p.beneficiary);
+        }
 
         _open(p, Ask.Challenge);
         intakeId = _ask(
@@ -306,6 +339,8 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
             revert WrongPanel();
         }
         bool yes = decodeBool(a);
+        // The Intake pairs this answer to our question. Also refuse reuse across different asks.
+        _consume(a.requestId);
 
         Ask ask = p.ask;
         address asker = p.asker;
@@ -390,35 +425,53 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
 
     // ================================================================ beneficiary
 
-    /// @notice A listed project's beneficiary can hand its points to another wallet.
+    /// @notice A listed project's beneficiary can hand its points to another wallet when no
+    /// question is open. The beneficiary named in a challenge remains its defended-bond recipient.
     function setBeneficiary(address project, address beneficiary) external {
         Project storage p = _projects[project];
         if (!p.listed) revert NotListed();
+        if (p.ask != Ask.None) revert AskOpen();
         if (msg.sender != p.beneficiary) revert NotBeneficiary();
         if (beneficiary == address(0)) revert ZeroAddress();
+        if (beneficiary != p.beneficiary) beneficiaryPinRequired[project] = true;
         p.beneficiary = beneficiary;
         emit BeneficiarySet(project, beneficiary);
     }
 
     // ================================================================ questions
 
-    /// @notice The rules every listed project must meet, as the panel reads them (JSON-ready).
+    /// @notice Application rules, including verification of the stated rate (JSON-ready).
     function definitions(address project, uint16 rateBps, address beneficiary)
         public
         pure
         returns (string memory)
     {
+        return _definitions(project, rateBps, beneficiary, true);
+    }
+
+    function _definitions(address project, uint16 rateBps, address beneficiary, bool application)
+        internal
+        pure
+        returns (string memory)
+    {
         string memory p = Strings.toHexString(project);
         string memory r = Strings.toString(rateBps);
+        string memory rate = application
+            ? string.concat(
+                "The amount credited per trade is ",
+                r,
+                " basis points of the trade (100 basis points = 1%), and that rate is between 25 and 100. If the rate can change, the code must keep it between 25 and 100 and ",
+                r,
+                " must be the rate in force now."
+            )
+            : "The amount credited per trade must be between 25 and 100 basis points of the trade (100 basis points = 1%). If the rate can change, the code must keep it between 25 and 100. Judge the rate in force now; the rate stated at application is historical and may differ.";
         return string.concat(
             '"trading":"',
             p,
             " is a trading venue (for example a Uniswap v4 hook, a pool or a launchpad) whose verified source calls credit(trader, amount) on the Stacker only while executing a trade, for the trader of that trade. It never credits wallets it chooses, and never credits IMD that does not come from the fees of that trade. A wallet, an unverified contract, or one that can call credit outside a trade fails this rule.",
-            '","rate":"The amount credited per trade is ',
-            r,
-            " basis points of the trade (100 basis points = 1%), and that rate is between 25 and 100. If the rate can change, the code must keep it between 25 and 100 and ",
-            r,
-            ' must be the rate in force now.","feeGuard":"Split the trading fee into three parts: the cashback; the parts that come back to the owner or team (owner share, treasury, liquidity the owner can withdraw); and the parts that leave for good (burned tokens, liquidity locked forever, prizes paid to others, fees to third parties). The parts that leave for good must add up to at least the cashback.","beneficiary":"',
+            '","rate":"',
+            rate,
+            '","feeGuard":"Split the trading fee into three parts: the cashback; the parts that come back to the owner or team (owner share, treasury, liquidity the owner can withdraw); and the parts that leave for good (burned tokens, liquidity locked forever, prizes paid to others, fees to third parties). The parts that leave for good must add up to at least the cashback.","beneficiary":"',
             Strings.toHexString(beneficiary),
             " must be the owner of ",
             p,
@@ -475,9 +528,9 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
         return string.concat(
             "imd/acc listing challenge. ",
             _intro(project),
-            " It is listed at a cashback rate of ",
+            " Its application stated a cashback rate of ",
             Strings.toString(rateBps),
-            " basis points with the beneficiary ",
+            " basis points (historical; the current rate may differ within 25-100). Its beneficiary is ",
             Strings.toHexString(beneficiary),
             ". Does it still meet every rule in the definitions today, judged from its verified source code and on-chain state? Answer true if it meets all of them (it stays listed), false if it breaks any (it is delisted). A challenger says [REASON]",
             reason,
@@ -496,7 +549,8 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
             applyQuestion(project, name, sourceUrl, rateBps, beneficiary),
             project,
             rateBps,
-            beneficiary
+            beneficiary,
+            true
         );
     }
 
@@ -507,24 +561,30 @@ contract ProjectRegistry is OracleAttestationConsumer, ReentrancyGuard {
         address beneficiary
     ) internal view returns (string memory) {
         return _body(
-            challengeQuestion(project, reason, rateBps, beneficiary), project, rateBps, beneficiary
+            challengeQuestion(project, reason, rateBps, beneficiary),
+            project,
+            rateBps,
+            beneficiary,
+            false
         );
     }
 
     /// @dev The oracle body as compact JSON. Every piece is printable ASCII without quotes or
     /// backslashes (the applicant's text is checked by `_checkText`), so nothing needs escaping.
-    function _body(string memory question, address project, uint16 rateBps, address beneficiary)
-        internal
-        view
-        returns (string memory)
-    {
+    function _body(
+        string memory question,
+        address project,
+        uint16 rateBps,
+        address beneficiary,
+        bool application
+    ) internal view returns (string memory) {
         return string.concat(
             '{"v":1,"question":"',
             question,
             '","chainId":',
             Strings.toString(questionChainId),
             ',"window":{"hours":1},"answerType":"bool","evidence":"panel","panelSize":15,"quorum":11,"validForSeconds":86400,"allowAmbiguous":true,"definitions":{',
-            definitions(project, rateBps, beneficiary),
+            _definitions(project, rateBps, beneficiary, application),
             '},"consumer":{"chainId":',
             Strings.toString(block.chainid),
             ',"verifyingContract":"',

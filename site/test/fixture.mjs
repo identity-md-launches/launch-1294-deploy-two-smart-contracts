@@ -9,7 +9,7 @@ const registry = '0x2222222222222222222222222222222222222222';
 export const project = '0x3333333333333333333333333333333333333333';
 export const hash = n => '0x' + BigInt(n).toString(16).padStart(64, '0');
 const iface = address => new Interface(address.toLowerCase() === stacker ? STACKER_ABI : address.toLowerCase() === registry ? REGISTRY_ABI : address.toLowerCase() === ADDRESSES.TestSIMD ? VAULT_ABI : address.toLowerCase() === ADDRESSES.Intake ? INTAKE_ABI : TOKEN_ABI);
-export const state = { chain: '0x1', number: 100, txs: [], logs: [], allowances: new Map(), balances: { [ADDRESSES.TestIMD]: 0n, [ADDRESSES.OracleIMD]: 0n }, shares: 0n, total: 0n, projects: new Map(), dropLogs: false, mutateOnApproval: false };
+export const state = { chain: '0x1', number: 100, txs: [], logs: [], allowances: new Map(), balances: { [ADDRESSES.TestIMD]: 0n, [ADDRESSES.OracleIMD]: 0n }, shares: 0n, total: 0n, projects: new Map(), dropLogs: false, mutateOnApproval: false, beneficiaryOnApproval: undefined };
 export const deployment = { chainId: 11155111, contracts: [{ contract: 'Stacker', address: stacker, blockNumber: 100, transactionHash: hash(1) }, { contract: 'ProjectRegistry', address: registry, blockNumber: 100, transactionHash: hash(1) }] };
 const zeroProject = () => [0n, false, 0n, 0n, 0n, 0n, account, 0n, account, hash(0)];
 const block = () => ({ number: '0x' + state.number.toString(16), hash: hash(state.number), timestamp: '0x6553f100' });
@@ -36,12 +36,14 @@ function readContract(target, data) {
 }
 function sendTransaction(transaction) {
   const target = transaction.to.toLowerCase(), parsed = iface(target).parseTransaction(transaction), args = parsed.args;
+  validateChallenge(transaction);
   assert.equal(state.chain, '0xaa36a7', 'all writes must stay on Sepolia');
   assert.equal(transaction.chainId, '0xaa36a7', 'wallet request itself pins Sepolia during confirmation');
   assert.equal(BigInt(transaction.gas), 130000n, 'gas estimate gets 30% headroom');
   const tx = { ...transaction, to: target, name: parsed.name, args: [...args], hash: hash(state.txs.length + 2) };
   state.txs.push(tx); state.number++;
   if (parsed.name === 'approve') { state.allowances.set(`${target}:${args[0]}`, args[1]); if (state.mutateOnApproval) state.chain = '0x1'; }
+  if (parsed.name === 'approve' && target === ADDRESSES.OracleIMD && state.beneficiaryOnApproval) state.projects.get(project)[6] = state.beneficiaryOnApproval;
   if (parsed.name === 'faucet') state.balances[ADDRESSES.TestIMD] += 10000n * 10n ** 18n;
   if (parsed.name === 'mint') { assert.equal(args[0].toLowerCase(), account); state.balances[ADDRESSES.OracleIMD] += args[1]; }
   if (parsed.name === 'credit') {
@@ -55,13 +57,25 @@ function sendTransaction(transaction) {
     state.projects.set(args[0].toLowerCase(), [1n, false, args[3], 1700000000n, 0n, 0n, args[4], 0n, account, hash(42)]);
     addEvent(registry, 'Applied', [args[0], account, hash(42), args[3], args[4], args[1], args[2]]);
   }
-  if (parsed.name === 'challenge') {
+  if (parsed.name === 'challengeForBeneficiary') {
     assert.equal(state.allowances.get(`${ADDRESSES.OracleIMD}:${registry}`), 5500000000000000000n);
     const p = state.projects.get(args[0].toLowerCase()); p[0] = 2n; p[3] = 1700000000n;
     addEvent(registry, 'Challenged', [args[0], account, hash(43), args[1]]);
   }
   if (parsed.name === 'expire') { const p = state.projects.get(args[0].toLowerCase()); p[0] = 0n; addEvent(registry, 'AskCleared', [args[0], hash(43), 2, 0, hash(0)]); }
   return tx.hash;
+}
+function validateChallenge(transaction) {
+  if (transaction.to?.toLowerCase() !== registry) return;
+  const parsed = iface(registry).parseTransaction(transaction);
+  if (parsed?.name === 'challengeForBeneficiary') {
+    const p = state.projects.get(parsed.args[0].toLowerCase());
+    if (p[6].toLowerCase() !== parsed.args[2].toLowerCase()) {
+      throw Object.assign(new Error('execution reverted'), {
+        code: 3, data: iface(registry).encodeErrorResult('BeneficiaryChanged', [parsed.args[2], p[6]]),
+      });
+    }
+  }
 }
 export async function rpc(method, params, wallet = false) {
   if (method === 'eth_chainId') return wallet ? state.chain : '0xaa36a7';
@@ -72,7 +86,7 @@ export async function rpc(method, params, wallet = false) {
   if (method === 'eth_getCode') return params[1] === '0x63' ? '0x' : '0x6000';
   if (method === 'eth_getLogs') { if (state.dropLogs) throw new Error('RPC history unavailable'); return state.logs.filter(log => log.address === params[0].address.toLowerCase() && BigInt(log.blockNumber) >= BigInt(params[0].fromBlock) && BigInt(log.blockNumber) <= BigInt(params[0].toBlock)); }
   if (method === 'eth_call') return readContract(params[0].to.toLowerCase(), params[0].data);
-  if (method === 'eth_estimateGas') return '0x186a0';
+  if (method === 'eth_estimateGas') { validateChallenge(params[0]); return '0x186a0'; }
   if (method === 'eth_sendTransaction') return sendTransaction(params[0]);
   if (method === 'eth_getTransactionReceipt') return receipt(params[0]);
   if (method === 'eth_getTransactionByHash') {
