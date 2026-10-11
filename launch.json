@@ -4,10 +4,10 @@
     {
       "contract": "Stacker",
       "constructorArgs": [
-        "0xD34a99Bc0f67aE1bbd63C660e6d0b0dd03E263B7",
-        "0x9Efa934D9fAd4AE28c998a40195646b965a97247"
+        "0x2B69099E59b05901faA1DD164fabf098bf831E82",
+        "0xF9e2EEc3B610ec6781f7438aC5Fb4bc049d81Cc1"
       ]
     }
   ],
-  "notes": "imd/acc on Ethereum mainnet: one contract, the Stacker, against the live IMD token and the live StakedIMD (sIMD) vault. No owner, admin, fee, pause or upgrade. credit(trader, imdAmount) pulls IMD from the calling project and calls sIMD.deposit(imdAmount, trader), so the shares go straight to the trader, then emits Stacked(project, trader, imd, shares). The constructor checks sIMD.asset() == IMD and approves the vault once; both run only where the vault has code, so the empty-chain rehearsal passes. TestIMD and TestSIMD under test/mocks are test doubles and are not deployed."
+  "notes": "imd/acc Sepolia test run 2: one contract, the updated Stacker, wired to the live TestIMD (with a faucet) and TestSIMD (a StakedIMD copy whose owner can pause it) deployed by launch #1129. No owner, admin, fee, pause or upgrade. credit(trader, imdAmount) pulls IMD from the calling project and calls TestSIMD.deposit(imdAmount, trader), so the shares go straight to the trader, then emits Stacked(project, trader, imd, shares). Per-project totals on chain; per-trader figures come from the events. The constructor checks asset() and approves the vault once, only where the vault has code, so the empty-chain rehearsal passes. TestIMD and TestSIMD under test/mocks are test doubles and are not deployed."
 }
