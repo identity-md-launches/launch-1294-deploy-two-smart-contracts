@@ -99,7 +99,7 @@ Every `Stacked` event is kept as a record. Points are the basis for the leaderbo
 - **Project points:** the IMD its traders stacked.
 - **Rate and guard:** each listing states the project's rate (0.25%–1%). To list, the part of the project's fee that really leaves it (to liquidity providers, burns, prizes) must be at least as large as its cashback, so trading with yourself to farm points always costs more than it brings back. Credits that don't match the stated rate earn no points.
 - **Listed projects only.** Anyone can call `credit` with their own IMD; that's just staking for someone, so it earns no points. Only credits from a listed project count, from the block it was listed (`fromBlock`), never before.
-- **The list today** is `projects.json` on the first test page (`{address, name, fromBlock}`). The test run 2 page reads [`listings/sepolia.json`](listings/sepolia.json) from this repository instead, so listing a project there is a commit, not a paid job. Later, an ownerless `ProjectRegistry` decided by an IMD oracle panel replaces it ([design notes](docs/design.md#which-projects-earn-points)).
+- **The list today** is a file per chain in this repository, [`listings/sepolia.json`](listings/sepolia.json) first, so listing a project is a commit, not a paid job. Projects apply with a [GitHub issue](https://github.com/khaed1/imd-acc/issues/new?template=listing-application.yml); the steps, checklist, fee guard and delisting are in [docs/listing.md](docs/listing.md). (The first test page shipped its own `projects.json`.) Later, an ownerless `ProjectRegistry` decided by an IMD oracle panel replaces it, with no Stacker redeploy ([design](docs/design.md#the-projectregistry)).
 - **How they're counted:** by adding up the `Stacked` events, which can't be changed or deleted. An indexer keeps the totals ready for the site; project totals are also on chain.
 
 **What a trader sees on the dashboard**, with no visit to the vault's site:
@@ -113,9 +113,10 @@ Every `Stacked` event is kept as a record. Points are the basis for the leaderbo
 
 The all-traders dashboard and leaderboards (top traders, top projects, 7-day and 30-day views) come from the same events.
 
-| Listed project | Address | From block | Status |
-|---|---|---|---|
-| PLEA | `0x3d4CcAc329010b8beA3b14498d9a45EAB00c68Cc` | 11,885,872 | Listing job ready ([`jobs/3-list-plea.md`](jobs/3-list-plea.md)) |
+| Project | Status |
+|---|---|
+| PLEA v10 (hook `0x3d4C…68Cc`, first Stacker) | Not listed. Its listing job for the first test page ([`jobs/3-list-plea.md`](jobs/3-list-plea.md)) is no longer needed, since test run 2 replaces that page. |
+| PLEA, next version (Stacker of test run 2) | To be listed in `listings/sepolia.json` at 50 bps once deployed; then the first applicant in the Sepolia ProjectRegistry trial. |
 
 ## Integrating a project
 
@@ -162,7 +163,7 @@ Rules:
 3. **Indexer and mainnet dashboard:** the events kept in a fast table, then the site with each trader's cashback, points and value, and the leaderboards.
 4. **Multichain:** Robinhood Chain first (PondPad), then Base and Arbitrum. Cashback waits per trader on that chain and goes to Ethereum through IMD's own LayerZero bridge, paid by a small tip ([design](docs/design.md#multichain-cashback-from-other-chains)).
 5. **v2: the ETH route** for projects whose fees are in ETH. `creditETH(trader)` records pending ETH; a public `flush()` swaps the batch to IMD through POOL4 behind a TWAP price guard, deposits it and splits the shares. Built once such a project wants in.
-6. **ProjectRegistry**: an ownerless project list decided by an IMD oracle panel, replacing `projects.json`, once more than one or two projects want in.
+6. **ProjectRegistry**: an ownerless project list decided by an IMD oracle panel through Intake v2 (whose failure callback clears an application the panel can't answer), replacing the list file. First trial on Sepolia with PLEA ([design](docs/design.md#the-projectregistry)).
 
 Open questions (with recommendations) are in the [design notes](docs/design.md#open-questions): an sIMD vault on Robinhood Chain, and cashback on sells as well as buys.
 
@@ -177,6 +178,7 @@ lib/                      forge-std, OpenZeppelin and Solady files, vendored
 launch.json               the IMD launch manifest: one Stacker, mainnet IMD and sIMD
 foundry.toml              solc 0.8.26, cancun, 10,000 optimizer runs, bytecode_hash none
 docs/
+  listing.md              how a project gets listed: steps, checklist, fee guard, delisting
   design.md               design detail: building blocks, points, ProjectRegistry, v2 ETH route,
                           decisions, open questions, launch settings, btc/acc lessons
   history.md              what happened so far, with the checks and transactions behind it
@@ -190,6 +192,7 @@ jobs/                     IMD swarm job prompts, in order
   5-sepolia-v2-site.md    its test page, built in the same order (ready)
   requests/               exact request bodies for the ready jobs
 listings/sepolia.json     projects that earn points on the Sepolia test run 2 page
+.github/ISSUE_TEMPLATE/   the "List my project" application form
 NEXT_SESSION.md           the brief for the next working session
 ```
 

@@ -72,3 +72,9 @@ PLEA is a sell-gated meme token on Uniswap v4 (its own repository, `khaed1/plea`
 - **Decided:** each project picks its cashback rate between 0.25% and 1% (was a fixed 0.5%; PLEA keeps 0.5%). Points stay 1 per IMD stacked, so a higher rate gives traders more points.
 - **Guard:** the part of a project's fee that really leaves it (liquidity, burns, prizes) must be at least its cashback, so self-trading for points always costs more than it returns. Listings state `rateBps`; the indexer flags credits that don't match it.
 - **No contract change:** the Stacker stakes whatever amount it's sent. The README, design notes, explainer, session brief and the texts of jobs 4 and 5 were updated, and the requests re-checked.
+
+## 8. Listing guide and the ProjectRegistry design (2026-10-11)
+
+- **Listing today:** `docs/listing.md` (steps, checklist, the fee guard with PLEA's numbers, when points start, delisting with `toBlock`, per-credit checks) and a GitHub application form. The Sepolia run 2 site brief now honours `toBlock`.
+- **ProjectRegistry:** designed in `docs/design.md` on Intake v2 (`0xa43e…de82`, code checked on Sepolia and mainnet; callback gas 1M on Sepolia, 200k on mainnet). `requestWithFailure` lets a refused or split panel clear the pending application at once; failures are unsigned, so they never list, delist or move value. No Stacker redeploy: the site and indexer read the registry instead of the file.
+- **Next:** a Sepolia trial with PLEA's next version as the first applicant, plus negative cases, a no-answer case and a challenge.

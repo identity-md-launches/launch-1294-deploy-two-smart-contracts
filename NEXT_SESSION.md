@@ -15,6 +15,8 @@ Trading cashback paid in **staked IMD (sIMD)**, inspired by TokenWorks' btc/acc.
 
 - **Sepolia test run 2 ready** (`jobs/5-sepolia-v2-launch.md` + `jobs/5-sepolia-v2-site.md`, request `jobs/requests/5-sepolia-v2-workflow.json`): the new Stacker from the `sepolia` branch on the live TestIMD/TestSIMD, plus a new test page that reads `listings/sepolia.json` from this repo. After it's live, PLEA's next version credits through it; list its hook by committing to `listings/sepolia.json`.
 
+- **Listing:** `docs/listing.md` (steps, checklist, fee guard, `toBlock` delisting) and the GitHub form `.github/ISSUE_TEMPLATE/listing-application.yml`. The ProjectRegistry (Intake v2, failure callback) is designed in `docs/design.md`; its first trial is on Sepolia with PLEA's next version.
+
 ## What's next (ask me before paying for any job)
 1. List PLEA. 2. Mainnet Stacker (PLEA mainnet needs its address). 3. Indexer and mainnet dashboard. 4. Multichain route, Robinhood Chain first (`docs/design.md`, "Multichain"). 5. v2 ETH route, when an ETH-fee project wants in. 6. ProjectRegistry, when more than one or two projects want listing. Open questions are in `docs/design.md`.
 
