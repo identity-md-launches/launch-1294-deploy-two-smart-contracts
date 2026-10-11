@@ -1,0 +1,2 @@
+export const integrationCode =
+  "// Once: let the Stacker pull IMD from your contract.\nIERC20(imd).approve(address(stacker), type(uint256).max);\n\n// On each trade, with the real trader taken from hookData:\nuint256 cashback = imdSideAmount * RATE_BPS / 10_000;        // your rate: 25-100 bps (0.25%-1%), out of your fee\ntry stacker.credit(trader, cashback) {\n    // the trader now holds the sIMD\n} catch {\n    IERC20(imd).transfer(trader, cashback);                  // plain IMD: the trade never reverts\n}";

@@ -1,0 +1,204 @@
+# imd/acc: contract integration on Sepolia test run 2
+
+Source: this repository's README.md (Integrating a project),
+docs/listing.md, src/Stacker.sol and src/ProjectRegistry.sol.
+Chain: Sepolia, 11155111. Start both event scans at block 11891109.
+
+Addresses:
+Stacker: 0x0457276d7b036818b3eddc1a4a3fceda61e9314d
+ProjectRegistry: 0x3a3bfcb65614292b0ec7c62f9e3a5dac003b920e
+TestIMD (staking asset): 0x2b69099e59b05901faa1dd164fabf098bf831e82
+TestSIMD (ERC-4626 vault): 0xf9e2eec3b610ec6781f7438ac5fb4bc049d81cc1
+Oracle fee token: 0x44a1cd38474fb1748400e7deb5f8d786cce3f89a
+Intake v2: 0xa43e6f75ee006411f79ac1c84120606c2330de82
+
+What happens:
+A trade pays cashback out of the project's existing fee. The trading
+contract calls Stacker.credit(trader, imdAmount). The Stacker pulls
+TestIMD from that caller, deposits into TestSIMD for the trader, and
+emits Stacked(project, trader, imd, shares). It has no owner or admin.
+A failed credit reverts its transfers. The integrator pays plain IMD
+in its catch branch. A zero amount emits no Stacked event.
+
+MUST rules:
+- Call credit from the trading contract itself. That contract holds
+  the IMD and has approved the Stacker to pull it. msg.sender becomes
+  the project in Stacked; a separate funding or forwarding wallet
+  would be recorded as the project instead.
+- Call credit only inside a real trade, for that trade's real trader.
+  Use router hookData, falling back to sender. Never use tx.origin.
+  Do not expose an arbitrary-wallet cashback function.
+- Fund cashback from the existing fee on the IMD side of the trade.
+  Keep the rate in 25-100 bps (0.25%-1%). If fees or rates can change,
+  enforce the range and fee guard in code.
+- The fee portion that permanently leaves the owner/team must be at
+  least the cashback. Burns, forever-locked liquidity, prizes to
+  others and third-party fees count. Owner shares, treasury and
+  withdrawable owner liquidity do not count.
+- Check sufficient gas BEFORE the try/catch. Short gas must revert
+  the swap, so gas estimation cannot select a cheaper fallback path.
+  Benchmark the complete trade and set an integration-specific gas
+  budget. Wallets send the gas estimate multiplied by 1.3.
+- Catch a failed credit and safely pay plain IMD to the same trader.
+  Test the paused vault failure path on Sepolia.
+- For Uniswap v4 hooks, include the afterSwap logic expected by the
+  frontend whitelist, support the router's msgSender and warn users
+  about copycat v2/v3 pools.
+- Skip the call when computed cashback is zero.
+
+Relevant Solidity interfaces:
+
+interface IStacker {
+    function IMD() external view returns (address);
+    function SIMD() external view returns (address);
+    function credit(address trader, uint256 imdAmount)
+        external returns (uint256 shares);
+    function totalStacked() external view returns (uint256);
+    function projectStacked(address project)
+        external view returns (uint256);
+    function projectShares(address project)
+        external view returns (uint256);
+    event Stacked(
+        address indexed project, address indexed trader,
+        uint256 imd, uint256 shares
+    );
+}
+
+interface IProjectRegistry {
+    enum Ask { None, Apply, Challenge }
+    struct Project {
+        Ask ask;
+        bool listed;
+        uint16 rateBps;
+        uint64 askedAt;
+        uint64 fromBlock;
+        uint64 toBlock;
+        address beneficiary;
+        uint64 challengeOpenAt;
+        address asker;
+        bytes32 intakeId;
+    }
+    function projectOf(address project)
+        external view returns (Project memory);
+    function isListed(address project) external view returns (bool);
+    function ORACLE_FEE() external view returns (uint256);
+    function challengeBond() external view returns (uint256);
+    function challengeCooldown() external view returns (uint64);
+    function PENDING_EXPIRY() external view returns (uint64);
+    function applyQuestion(
+        address project, string calldata name,
+        string calldata sourceUrl, uint16 rateBps,
+        address beneficiary
+    ) external view returns (string memory);
+    function applyListing(
+        address project, string calldata name,
+        string calldata sourceUrl, uint16 rateBps,
+        address beneficiary
+    ) external returns (bytes32 intakeId);
+    function challengeForBeneficiary(
+        address project, string calldata reason,
+        address expectedBeneficiary
+    ) external returns (bytes32 intakeId);
+    function expire(address project) external;
+    event Listed(
+        address indexed project, uint16 rateBps,
+        address beneficiary, uint64 fromBlock,
+        bytes32 oracleRequestId
+    );
+    event Delisted(
+        address indexed project, uint64 toBlock,
+        bytes32 oracleRequestId
+    );
+}
+
+Minimal Solidity integration fragment (Solidity 0.8.26):
+Use IStacker above with these imports. Extend the actual trading
+contract with this internal helper; it is not a standalone trading
+venue. Authenticate the router and obtain the real trader in the
+trade callback, then call _cashback there. The supplied minCreditGas_
+comes from tests of that integration, including its first credit.
+The trading contract must have the cashback IMD from its trade fee.
+
+import {IERC20} from
+    "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from
+    "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+abstract contract TradingCashback {
+    using SafeERC20 for IERC20;
+    IERC20 public immutable imd;
+    IStacker public immutable stacker;
+    uint16 public immutable rateBps;
+    uint256 public immutable minCreditGas;
+
+    constructor(
+        IERC20 imd_, IStacker stacker_, uint16 rateBps_,
+        uint256 minCreditGas_
+    ) {
+        require(rateBps_ >= 25 && rateBps_ <= 100, "rate");
+        require(minCreditGas_ > 0, "benchmark gas first");
+        imd = imd_;
+        stacker = stacker_;
+        rateBps = rateBps_;
+        minCreditGas = minCreditGas_;
+        imd_.forceApprove(address(stacker_), type(uint256).max);
+    }
+
+    // Called ONLY from the authenticated trade execution path.
+    function _cashback(address trader, uint256 imdSideAmount)
+        internal
+    {
+        uint256 cashback = imdSideAmount * rateBps / 10_000;
+        if (cashback == 0) return;
+        require(gasleft() >= minCreditGas, "short cashback gas");
+        try stacker.credit(trader, cashback) returns (uint256) {
+            // Vault shares were minted directly to the trader.
+        } catch {
+            imd.safeTransfer(trader, cashback);
+        }
+    }
+}
+
+Tests to write for the actual integration:
+- Normal trade: Stacked.project is the trading contract itself;
+  Stacked.trader is the authenticated trader; IMD and share balances
+  match cashback at the current rate. Exercise buys and sells.
+- Paused vault: the trade completes and the real trader receives
+  plain IMD; no successful Stacked event or vault deposit occurs.
+- Short gas: the swap reverts before credit, with no partial trade
+  or silently selected plain-IMD path. Test first and repeat credits.
+- Zero cashback: skip credit entirely, including at tiny trade sizes.
+- No external entry point can pay chosen wallets outside a trade.
+- Funding and allowance belong to the trading contract. Verify the
+  fee guard, rate bounds and authentic router/trader resolution.
+
+Listing and points:
+Anyone can apply. Read ORACLE_FEE() live; zero means unavailable.
+Approve exactly the fee in the oracle fee token. A project must
+have code. Name: 1-48 characters. HTTPS source URL: 12-200 characters.
+Text must be printable ASCII without double quotes, backslashes or
+square brackets. Rate: 25-100 bps. Beneficiary must be nonzero. The
+project must not already be listed or have an open question.
+
+The IdentityMD oracle panel checks verified source and on-chain
+state. True lists the project starting at that block. False rejects
+it. A refused or unanswered question clears without a listing.
+The beneficiary must belong to the project's owner, team or treasury.
+
+After challengeOpenAt, anyone can challenge a listed project with
+no open question. Approve exactly ORACLE_FEE() + challengeBond().
+Use challengeForBeneficiary with the reviewed beneficiary. If it
+still meets the rules, the bond goes to that beneficiary. Otherwise
+it is delisted and the bond returns. A defended challenge does not
+restart the cooldown. A beneficiary change before inclusion reverts.
+
+Expire a question only after askedAt + PENDING_EXPIRY (strictly
+older), or if Intake.requests(intakeId).completed is true. Any
+challenge bond returns when an unanswered question is cleared.
+
+Points are computed off chain from Stacked events and all listing
+periods: 1 point per IMD when fromBlock <= block < toBlock. An open
+period has no end. Credits outside periods are direct, no points.
+Delisting preserves earlier points. No airdrop is promised.
+Cashback value is the event shares through convertToAssets, not the
+wallet's present share balance. Earned on top = value minus received.

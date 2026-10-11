@@ -1,111 +1,589 @@
-// Offline browser integration test. Uses a fresh headless Chrome profile, mocked RPC and wallet.
-// No transaction is sent to a chain and no wallet key is loaded. No npm packages are required.
-import { createServer } from 'node:http';
-import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join, resolve, extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import assert from 'node:assert/strict';
-import { ADDRESSES } from '../core.mjs';
+import assert from "node:assert/strict";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { chromium } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { Interface, Wallet } from "ethers";
 
-const root = fileURLToPath(new URL('..', import.meta.url));
-const chromePath = process.argv[2] || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const directory = await mkdtemp(join(tmpdir(), 'imd-browser-'));
-import { state, deployment, account, project, hash, addEvent, rpc } from './fixture.mjs';
-const server = createServer(async (req, res) => {
-  try {
-    if (req.url === '/mockrpc') {
-      let body = ''; for await (const chunk of req) body += chunk;
-      const input = JSON.parse(body);
-      let out; try { out = { result: await rpc(input.method, input.params || [], input.wallet) }; } catch (e) { out = { error: { message: e.message } }; }
-      res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(out)); return;
-    }
-    const fixture = req.url.startsWith('/fixture/');
-    const path = req.url.replace(/^\/(pending|fixture)\//, '/').split('?')[0];
-    if (path === '/deployment.json') { res.statusCode = fixture ? 200 : 404; res.setHeader('content-type', 'application/json'); res.end(fixture ? JSON.stringify(deployment) : '{}'); return; }
-    const target = resolve(root, '.' + path);
-    if (!target.startsWith(root)) { res.statusCode = 403; res.end(); return; }
-    const contents = await readFile(target);
-    res.setHeader('content-type', ({ '.html': 'text/html', '.mjs': 'text/javascript', '.css': 'text/css' })[extname(target)] || 'text/plain'); res.end(contents);
-  } catch { res.statusCode = 404; res.end(); }
+const base = process.env.PREVIEW_URL || "http://127.0.0.1:4173/preview/";
+const output = process.env.EVIDENCE_DIR || "/tmp/imd-acc-browser-evidence";
+const fork = process.env.FORK_RPC;
+const mode = process.env.CHECK_MODE || "all";
+if (mode === "fork" && !fork)
+  throw new Error("CHECK_MODE=fork requires FORK_RPC.");
+if (
+  fork &&
+  !["127.0.0.1", "localhost", "[::1]"].includes(new URL(fork).hostname)
+) {
+  throw new Error("FORK_RPC must point to a local Anvil fork.");
+}
+const browser = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH || undefined,
+  headless: true,
 });
-await new Promise(r => server.listen(0, '127.0.0.1', r));
-const base = `http://127.0.0.1:${server.address().port}`;
-let chrome, socket;
-const delay = ms => new Promise(r => setTimeout(r, ms));
-try {
-  chrome = spawn(chromePath, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--remote-debugging-port=0', `--user-data-dir=${directory}`, 'about:blank'], { stdio: 'ignore' });
-  chrome.on('error', e => { console.error(e.message); });
-  let port;
-  for (let i = 0; i < 100; i++) { try { port = (await readFile(join(directory, 'DevToolsActivePort'), 'utf8')).split('\n')[0]; break; } catch { await delay(100); } }
-  if (!port) throw new Error('Chrome did not start; pass its executable as the first argument.');
-  const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  socket = new WebSocket(pages.find(p => p.type === 'page').webSocketDebuggerUrl);
-  await new Promise(r => socket.addEventListener('open', r, { once: true }));
-  let seq = 0; const pending = new Map(), errors = [];
-  socket.addEventListener('message', event => {
-    const m = JSON.parse(event.data);
-    if (m.id) { const [yes, no] = pending.get(m.id); pending.delete(m.id); m.error ? no(new Error(m.error.message)) : yes(m.result); }
-    if (m.method === 'Runtime.exceptionThrown') errors.push(m.params.exceptionDetails.text + ' ' + (m.params.exceptionDetails.exception?.description || ''));
+const deployment = JSON.parse(
+  await readFile(new URL("../src/deployment.json", import.meta.url), "utf8"),
+);
+const stacker = deployment.contracts.find((c) => c.name === "Stacker").address;
+const registry = deployment.contracts.find(
+  (c) => c.name === "ProjectRegistry",
+).address;
+const registryInterface = new Interface(
+  JSON.parse(
+    await readFile(
+      new URL("../src/abi/ProjectRegistry.json", import.meta.url),
+      "utf8",
+    ),
+  ),
+);
+await mkdir(output, { recursive: true });
+const report = {
+  mode,
+  checkedAt: new Date().toISOString(),
+  live: [],
+  fork: [],
+  errors: [],
+  accessibility: [],
+  measurements: [],
+};
+const rpc = async (method, params = []) => {
+  const response = await fetch(fork, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
   });
-  const cdp = (method, params = {}) => new Promise((yes, no) => { const id = ++seq; pending.set(id, [yes, no]); socket.send(JSON.stringify({ id, method, params })); });
-  const evaluate = async expression => { const r = await cdp('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description); return r.result.value; };
-  const wait = async expression => { for (let i = 0; i < 150; i++) { if (await evaluate(expression)) return; await delay(100); } throw new Error(`Timed out: ${expression}\n${await evaluate('document.body.innerText')}`); };
-  await cdp('Page.enable'); await cdp('Runtime.enable');
-  await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `
-    const realFetch = window.fetch.bind(window);
-    window.fetch = (url, options) => typeof url === 'string' && url.startsWith('https://') ? realFetch('${base}/mockrpc', options) : realFetch(url, options);
-    window.ethereum = { on() {}, request: async ({method, params = []}) => { const r = await (await realFetch('${base}/mockrpc', {method:'POST',body:JSON.stringify({method,params,wallet:true})})).json(); if(r.error) throw new Error(r.error.message); return r.result; } };
-  ` });
-  await cdp('Emulation.setDeviceMetricsOverride', { width: 360, height: 780, deviceScaleFactor: 1, mobile: true });
-  await cdp('Page.navigate', { url: `${base}/pending/index.html` });
-  await wait("document.getElementById('release-status')?.textContent.includes('awaiting deployment')");
-  assert.equal(await evaluate("[...document.querySelectorAll('[data-write]')].every(b => b.disabled)"), true);
-  assert.equal(await evaluate('document.documentElement.scrollWidth <= 360'), true, 'no horizontal scroll at 360px');
-  const screenshot = await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
-  await writeFile(join(directory, 'mobile.png'), Buffer.from(screenshot.data, 'base64'));
-  console.log('PASS predeployment state and 360px layout');
-  await cdp('Page.navigate', { url: `${base}/fixture/index.html` });
-  await wait("document.getElementById('release-status')?.textContent.includes('release connected')");
-  await evaluate("document.getElementById('connect').click()");
-  await wait("document.getElementById('wallet-status').textContent.includes('Connected on Sepolia')");
-  assert.equal(state.chain, '0xaa36a7');
-  const clickAndWait = async (button, status) => { await evaluate(`document.querySelector(${JSON.stringify(button)}).click()`); await wait(`document.getElementById(${JSON.stringify(status)}).textContent.includes('confirmed.') && !document.getElementById('connect').disabled`); };
-  await clickAndWait('#faucet', 'faucet-status');
-  await evaluate("document.getElementById('stack-amount').value='5'");
-  await clickAndWait('#stack-form button', 'stack-status');
-  assert.equal(await evaluate("document.getElementById('cashback').textContent"), '5 IMD');
-  assert.equal(await evaluate("document.getElementById('points').textContent"), '0');
-  assert.equal(await evaluate("document.getElementById('value').textContent"), '5 IMD');
-  await clickAndWait('#mint', 'mint-status');
-  await evaluate(`document.getElementById('apply-project').value='${project}';document.getElementById('apply-name').value='<img src=x onerror=alert(1)>';document.getElementById('apply-url').value='https://example.org/source';document.getElementById('apply-beneficiary').value='${account}'`);
-  await clickAndWait('#apply-form button', 'apply-status');
-  assert.equal(await evaluate("document.querySelector('#projects img') === null"), true, 'untrusted names are text');
-  const p = state.projects.get(project); p[0] = 0n; p[1] = true; p[4] = BigInt(state.number); p[7] = 0n;
-  addEvent(deployment.contracts[1].address, 'Listed', [project, 50, account, state.number, hash(44)]);
-  await evaluate(`document.getElementById('challenge-project').value='${project}';document.getElementById('challenge-beneficiary').value='${account}';document.getElementById('challenge-reason').value='It credits outside trades.'`);
-  await clickAndWait('#challenge-form button', 'challenge-status');
-  await evaluate("document.querySelector('#projects button[data-write]').click()");
-  await wait("!document.getElementById('connect').disabled && !document.querySelector('#projects button[data-write]')");
-  assert.equal(state.txs.at(-1).name, 'expire');
-  assert.ok(state.txs.some(tx => tx.name === 'mint' && tx.to === ADDRESSES.OracleIMD));
-  assert.ok(state.txs.some(tx => tx.name === 'faucet' && tx.to === ADDRESSES.TestIMD));
-  console.log('PASS wallet switch, faucet, exact approvals, self-stack, separate oracle mint, application, challenge, expiry, safe text rendering');
-  state.mutateOnApproval = true;
-  const previousCredits = state.txs.filter(tx => tx.name === 'credit').length;
-  await evaluate("document.querySelector('#stack-form button').click()");
-  await wait("document.getElementById('stack-status').textContent.includes('Wallet account or network changed')");
-  assert.equal(state.txs.filter(tx => tx.name === 'credit').length, previousCredits);
-  console.log('PASS network change after approval prevents the deposit');
-  state.dropLogs = true;
-  await evaluate("document.getElementById('refresh').click()");
-  await wait("document.getElementById('release-status').textContent.includes('Data unavailable or stale')");
-  assert.equal(await evaluate("[...document.querySelectorAll('[data-write]')].every(b => b.disabled)"), true);
-  console.log('PASS RPC history failure disables transactions and marks data stale');
-  assert.deepEqual(errors, [], 'no browser exceptions');
-  console.log(`Browser screenshot: ${join(directory, 'mobile.png')}`);
+  const body = await response.json();
+  if (body.error) throw new Error(body.error.message);
+  return body.result;
+};
+const until = async (page, predicate, label, timeout = 60000) => {
+  await page.waitForFunction(predicate, undefined, { timeout });
+  report.fork.push(label);
+  console.log(label);
+};
+try {
+  if (mode !== "fork") {
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+    });
+    const page = await context.newPage();
+    page.on("pageerror", (e) => report.errors.push(e.message));
+    page.on("console", (e) => {
+      if (e.type() === "error") report.errors.push(e.text());
+    });
+    await page.goto(base, { waitUntil: "networkidle" });
+    await page.getByText(/Data at block/).waitFor({ timeout: 90000 });
+    report.live.push(await page.locator(".data-line").innerText());
+    assert.equal(
+      await page
+        .locator(".alarm")
+        .filter({ hasText: /Sepolia data is unavailable/ })
+        .count(),
+      0,
+    );
+    for (const width of [360, 390, 768, 1280])
+      for (const theme of ["light", "dark"]) {
+        await page.setViewportSize({ width, height: 900 });
+        if ((await page.locator("html").getAttribute("data-theme")) !== theme)
+          await page.locator(".theme-button").click();
+        for (const route of ["#/", "#/docs"]) {
+          await page.goto(base + route, { waitUntil: "networkidle" });
+          await page
+            .getByText(/Data at block/)
+            .first()
+            .waitFor({
+              state: route === "#/" ? "visible" : "attached",
+              timeout: 60000,
+            });
+          await page.evaluate(() => document.fonts.ready);
+          const result = await page.evaluate(() => ({
+            width: innerWidth,
+            scroll: document.documentElement.scrollWidth,
+            theme: document.documentElement.dataset.theme,
+            headerHeight: document
+              .querySelector(".topbar-inner")
+              .getBoundingClientRect().height,
+            heading: getComputedStyle(
+              document.querySelector("main:not([hidden]) h1"),
+            ).fontSize,
+            fonts: [...document.fonts].map((f) => `${f.weight}:${f.status}`),
+            connect: document
+              .querySelector(".intro-stack button")
+              .getBoundingClientRect().bottom,
+          }));
+          assert.equal(
+            result.scroll,
+            width,
+            `overflow: ${width} ${theme} ${route}`,
+          );
+          assert.ok(result.fonts.every((f) => f.endsWith("loaded")));
+          if (route === "#/" && width === 390)
+            assert.ok(
+              result.connect < 844,
+              "primary action above first screen",
+            );
+          if (width === 360)
+            assert.ok(result.headerHeight < 60, "one-row topbar");
+          const axe = await new AxeBuilder({ page })
+            .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+            .analyze();
+          report.accessibility.push({
+            width,
+            theme,
+            route,
+            violations: axe.violations.map((v) => ({
+              id: v.id,
+              nodes: v.nodes.map((n) => n.target),
+            })),
+          });
+          assert.equal(
+            axe.violations.length,
+            0,
+            JSON.stringify(
+              axe.violations.map((v) => ({
+                id: v.id,
+                nodes: v.nodes.map((n) => n.target),
+              })),
+            ),
+          );
+          report.measurements.push({ route, ...result });
+          if (width !== 390)
+            await page.screenshot({
+              path: resolve(
+                output,
+                `${route === "#/" ? "app" : "docs"}-${width}-${theme}.png`,
+              ),
+              type: "png",
+            });
+        }
+      }
+    await page.goto(base + "#/docs/for-agents");
+    assert.equal(
+      await page.evaluate(() => document.activeElement.id),
+      "for-agents",
+    );
+    const text = await page.locator("#for-agents pre").innerText();
+    const download = await context.request.get(base + "llms.txt");
+    assert.equal(download.status(), 200);
+    assert.equal((await download.text()).trim(), text.trim());
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page
+      .getByRole("button", { name: "Copy agent guide", exact: true })
+      .click();
+    assert.equal(
+      (await page.evaluate(() => navigator.clipboard.readText())).trim(),
+      text.trim(),
+    );
+    report.live.push("Docs anchor, llms.txt and copy agent guide passed.");
+    await page.goto(base + "#/");
+    await page.getByRole("button", { name: "Switch to light theme" }).click();
+    await page.reload();
+    assert.equal(
+      await page.locator("html").getAttribute("data-theme"),
+      "light",
+    );
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    assert.equal(
+      await page
+        .locator(".connect-button")
+        .evaluate((e) => getComputedStyle(e).transitionDuration),
+      "0s",
+    );
+    await page.keyboard.press("Tab");
+    assert.equal(
+      await page.evaluate(() => document.activeElement.className),
+      "skip-link",
+    );
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(
+      () => document.activeElement.id === "stack-title",
+    );
+    report.live.push(
+      "Remembered theme, reduced motion and keyboard skip link exercised.",
+    );
+    await page.getByRole("tab", { name: "Apply", exact: true }).focus();
+    await page.keyboard.press("ArrowRight");
+    assert.equal(
+      await page
+        .getByRole("tab", { name: "Challenge", exact: true })
+        .getAttribute("aria-selected"),
+      "true",
+    );
+    await page.keyboard.press("Home");
+    assert.equal(
+      await page
+        .getByRole("tab", { name: "Apply", exact: true })
+        .getAttribute("aria-selected"),
+      "true",
+    );
+    report.live.push("Keyboard tab navigation passed.");
+    await page.route(
+      /https:\/\/(rpc\.sepolia\.ethpandaops\.io|sepolia\.rpc\.sentio\.xyz|ethereum-sepolia-rpc\.publicnode\.com)\/?$/,
+      (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            error: {
+              code: -32000,
+              message: "Read service unavailable for test",
+            },
+          }),
+        }),
+    );
+    await page.reload();
+    await page
+      .getByRole("button", { name: "Retry data", exact: true })
+      .first()
+      .waitFor();
+    assert.equal(
+      await page
+        .getByRole("button", { name: "Claim faucet", exact: true })
+        .isDisabled(),
+      true,
+    );
+    await page.unrouteAll();
+    await page
+      .getByRole("button", { name: "Retry data", exact: true })
+      .first()
+      .click();
+    await page.getByText(/Data at block/).waitFor({ timeout: 90000 });
+    report.live.push(
+      "Read-error state disables writes, and Retry recovers live data.",
+    );
+    assert.equal(report.errors.length, 0, report.errors.join("\n"));
+    await context.close();
+  }
+  if (fork && mode !== "live") {
+    // All writes below go to a local fork. No private key or live-chain signer.
+    const tester = Wallet.createRandom().address;
+    await rpc("anvil_impersonateAccount", [tester]);
+    await rpc("anvil_setBalance", [tester, "0x56bc75e2d63100000"]);
+    const ctx = await browser.newContext({
+      viewport: { width: 390, height: 900 },
+    });
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => report.errors.push(e.message));
+    p.on("console", (e) => {
+      if (e.type() === "error") report.errors.push(e.text());
+    });
+    await p.route(
+      /https:\/\/(rpc\.sepolia\.ethpandaops\.io|sepolia\.rpc\.sentio\.xyz|ethereum-sepolia-rpc\.publicnode\.com)\/?$/,
+      async (route) => {
+        const request = route.request();
+        const response = await fetch(fork, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: request.postData(),
+        });
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: await response.text(),
+        });
+      },
+    );
+    await p.addInitScript(
+      ({ fork, tester }) => {
+        const listeners = new Map();
+        window.__walletControl = {
+          chain: "0x1",
+          rejectNext: false,
+          accounts: [tester],
+          calls: [],
+          estimates: [],
+          gasChecks: [],
+        };
+        const control = window.__walletControl;
+        const provider = {
+          request: async ({ method, params = [] }) => {
+            control.calls.push({ method, params });
+            if (method === "eth_accounts" || method === "eth_requestAccounts")
+              return control.accounts;
+            if (method === "eth_chainId") return control.chain;
+            if (method === "wallet_switchEthereumChain") {
+              control.chain = params[0].chainId;
+              for (const f of listeners.get("chainChanged") || [])
+                f(control.chain);
+              return null;
+            }
+            if (method === "eth_sendTransaction") {
+              const estimate = [...control.estimates]
+                .reverse()
+                .find((e) => e.data === params[0].data);
+              control.gasChecks.push(
+                !!estimate &&
+                  BigInt(params[0].gas) ===
+                    (BigInt(estimate.result) * 130n + 99n) / 100n,
+              );
+            }
+            if (method === "eth_sendTransaction" && control.rejectNext) {
+              control.rejectNext = false;
+              throw Object.assign(new Error("User rejected"), { code: 4001 });
+            }
+            const response = await fetch(fork, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({
+                jsonrpc: "2.0",
+                id: Date.now(),
+                method,
+                params,
+              }),
+            });
+            const body = await response.json();
+            if (body.error)
+              throw Object.assign(new Error(body.error.message), body.error);
+            if (method === "eth_estimateGas")
+              control.estimates.push({
+                data: params[0].data,
+                result: body.result,
+              });
+            return body.result;
+          },
+          on: (event, fn) => {
+            const list = listeners.get(event) || [];
+            listeners.set(event, [...list, fn]);
+          },
+          removeListener: (event, fn) =>
+            listeners.set(
+              event,
+              (listeners.get(event) || []).filter((f) => f !== fn),
+            ),
+        };
+        const announce = () => {
+          dispatchEvent(
+            new CustomEvent("eip6963:announceProvider", {
+              detail: {
+                info: {
+                  uuid: "fork-wallet",
+                  name: "Sepolia fork wallet",
+                  rdns: "test.local",
+                },
+                provider,
+              },
+            }),
+          );
+          dispatchEvent(
+            new CustomEvent("eip6963:announceProvider", {
+              detail: {
+                info: {
+                  uuid: "second-wallet",
+                  name: "Second test wallet",
+                  rdns: "test.second",
+                },
+                provider: { ...provider },
+              },
+            }),
+          );
+        };
+        addEventListener("eip6963:requestProvider", announce);
+        announce();
+      },
+      { fork, tester },
+    );
+    await p.goto(base);
+    await p
+      .getByRole("button", { name: "Connect wallet", exact: true })
+      .click();
+    await p
+      .getByRole("button", { name: "Sepolia fork wallet", exact: true })
+      .waitFor();
+    await p.keyboard.press("Escape");
+    assert.equal(await p.locator("dialog").isVisible(), false);
+    await p
+      .getByRole("button", { name: "Connect wallet", exact: true })
+      .click();
+    await p
+      .getByRole("button", { name: "Sepolia fork wallet", exact: true })
+      .click();
+    await until(
+      p,
+      () => !document.querySelector("#tools button").disabled,
+      "EIP-6963 selection and Sepolia switch passed.",
+    );
+    await p.evaluate(() => {
+      window.__walletControl.rejectNext = true;
+    });
+    await p.getByRole("button", { name: "Claim faucet", exact: true }).click();
+    await p
+      .getByText("Request cancelled in your wallet. You can try again.", {
+        exact: true,
+      })
+      .waitFor();
+    report.fork.push("Rejected signature has a plain per-button error.");
+    await p.getByRole("button", { name: "Claim faucet", exact: true }).click();
+    await until(
+      p,
+      () =>
+        document
+          .querySelector("#tools")
+          .innerText.includes("Balance: 10,000.0000"),
+      "Faucet minted 10,000 and refreshed balance.",
+    );
+    await p.getByRole("button", { name: "Approve IMD", exact: true }).click();
+    await until(
+      p,
+      () => !document.querySelector('#tools button[type="submit"]').disabled,
+      "Exact stake approval enables credit.",
+    );
+    await p
+      .getByRole("button", { name: "Stack to myself", exact: true })
+      .click();
+    await until(
+      p,
+      () =>
+        document.querySelector("#stack").innerText.includes("1.0000") &&
+        document
+          .querySelector("#leaderboards")
+          .innerText.includes("Direct, no points"),
+      "Credit updates cashback, vault value, project split and recent stacks.",
+    );
+    assert.match(await p.locator("#stack").innerText(), /Points\n0\.0000/);
+    assert.match(await p.locator("#leaderboards").innerText(), /No points yet/);
+    assert.ok(
+      await p.evaluate(() => window.__walletControl.gasChecks.every(Boolean)),
+      "every transaction uses its estimate multiplied by 1.3",
+    );
+    await p.locator("#apply-project").fill(stacker);
+    await p.locator("#apply-name").fill("Local fork integration check");
+    await p
+      .locator("#apply-url")
+      .fill(`https://sepolia.etherscan.io/address/${stacker}`);
+    await p.locator("#apply-beneficiary").fill(tester);
+    await p
+      .getByRole("button", { name: "Copy question", exact: true })
+      .waitFor({ timeout: 30000 });
+    const expectedQuestion = registryInterface.decodeFunctionResult(
+      "applyQuestion",
+      await rpc("eth_call", [
+        {
+          to: registry,
+          data: registryInterface.encodeFunctionData("applyQuestion", [
+            stacker,
+            "Local fork integration check",
+            `https://sepolia.etherscan.io/address/${stacker}`,
+            50,
+            tester,
+          ]),
+        },
+        "latest",
+      ]),
+    )[0];
+    assert.equal(
+      await p.locator("#apply-panel pre").innerText(),
+      expectedQuestion,
+    );
+    await p
+      .getByRole("button", { name: "Get 10 test IMD", exact: true })
+      .click();
+    await until(
+      p,
+      () =>
+        document
+          .querySelector("#apply-panel")
+          .innerText.includes("Balance: 10.0000"),
+      "Open mint supplies the separate oracle fee token.",
+    );
+    await p.getByRole("button", { name: "Approve fee", exact: true }).click();
+    await until(
+      p,
+      () =>
+        !document.querySelector('#apply-panel button[type="submit"]').disabled,
+      "Exact oracle fee approval enables application.",
+    );
+    await p
+      .getByRole("button", { name: "Apply for listing", exact: true })
+      .click();
+    await until(
+      p,
+      () =>
+        document
+          .querySelector("#questions")
+          .innerText.includes("Local fork integration check") &&
+        document.querySelector("#questions").innerText.includes("Application"),
+      "Application appears in open questions with project, asker and age.",
+    );
+    await p.screenshot({
+      path: resolve(output, "fork-application-390.png"),
+      type: "png",
+      fullPage: true,
+    });
+    await rpc("evm_increaseTime", [86401]);
+    await rpc("evm_mine");
+    await until(
+      p,
+      () => !document.querySelector("#questions article button").disabled,
+      "The 15-second poll enables expiry after the live contract threshold, without a manual refresh.",
+    );
+    await p.getByRole("button", { name: "Expire", exact: true }).click();
+    await until(
+      p,
+      () =>
+        document
+          .querySelector("#questions")
+          .innerText.includes("Question cleared without a decision"),
+      "Expire clears the question and shows its outcome.",
+    );
+    for (const width of [360, 768, 1280])
+      for (const theme of ["light", "dark"]) {
+        await p.setViewportSize({ width, height: 900 });
+        if ((await p.locator("html").getAttribute("data-theme")) !== theme)
+          await p.locator(".theme-button").click();
+        assert.equal(
+          await p.evaluate(() => document.documentElement.scrollWidth),
+          width,
+          "populated app has no page overflow",
+        );
+        console.log(`Auditing populated app: ${width}px ${theme}`);
+        const axe = await new AxeBuilder({ page: p })
+          .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+          .analyze();
+        assert.equal(
+          axe.violations.length,
+          0,
+          JSON.stringify(
+            axe.violations.map((v) => ({
+              id: v.id,
+              nodes: v.nodes.map((n) => n.target),
+            })),
+          ),
+        );
+        report.accessibility.push({
+          width,
+          theme,
+          route: "#/ (populated local fork)",
+          violations: [],
+        });
+        await p.locator("#stack").screenshot({
+          path: resolve(output, `stack-${width}-${theme}.png`),
+          type: "png",
+        });
+        console.log(`Populated app checked: ${width}px ${theme}`);
+      }
+    report.fork.push(
+      "Populated tables and wallet balances pass overflow and accessibility checks at 360, 768 and 1280 in both themes.",
+    );
+    report.fork.push(
+      "No live-chain writes were sent. Fork application uses an existing non-trading contract to exercise contract prechecks only.",
+    );
+    assert.ok(
+      await p.evaluate(() => window.__walletControl.gasChecks.every(Boolean)),
+      "all wallet gas limits equal estimate times 1.3",
+    );
+    report.fork.push(
+      "All transaction gas limits equal the captured estimate multiplied by 1.3, rounded up.",
+    );
+    await ctx.close();
+  }
+  assert.equal(report.errors.length, 0, report.errors.join("\n"));
+  console.log(JSON.stringify(report, null, 2));
 } finally {
-  socket?.close(); chrome?.kill(); await new Promise(r => server.close(r));
-  // Keep the temporary screenshot for manual inspection; the fresh browser profile contains no keys.
+  await writeFile(
+    resolve(output, "results.json"),
+    JSON.stringify(report, null, 2) + "\n",
+  );
+  await browser.close();
 }

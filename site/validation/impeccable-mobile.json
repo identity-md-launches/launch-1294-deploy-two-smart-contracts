@@ -1,0 +1,26 @@
+[
+  {
+    "antipattern": "flat-type-hierarchy",
+    "name": "Flat type hierarchy",
+    "description": "Dominant heading and body roles are separated by less than 1.25× at every step, leaving the size hierarchy flat. Add at least one stronger size step.",
+    "severity": "advisory",
+    "category": "slop",
+    "file": "http://127.0.0.1:4173/preview/",
+    "line": 0,
+    "snippet": "Role sizes: body 13px, h3 14px, h2 15px, h1 18px (largest adjacent step 1.20:1; target 1.25:1; weight separates headings from body text)",
+    "advisory": true,
+    "selector": "body"
+  },
+  {
+    "antipattern": "flat-type-hierarchy",
+    "name": "Flat type hierarchy",
+    "description": "Dominant heading and body roles are separated by less than 1.25× at every step, leaving the size hierarchy flat. Add at least one stronger size step.",
+    "severity": "advisory",
+    "category": "slop",
+    "file": "http://127.0.0.1:4173/preview/#/docs",
+    "line": 0,
+    "snippet": "Role sizes: body 14px, h3 14px, h2 15px, h1 18px (largest adjacent step 1.20:1; target 1.25:1; weight separates headings from body text)",
+    "advisory": true,
+    "selector": "body"
+  }
+]

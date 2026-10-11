@@ -1,0 +1,32 @@
+{
+  "name": "imd-acc-site",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "node scripts/verify-abi.mjs && tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "tsx --test test/core.test.ts",
+    "test:browser": "node test/browser.mjs",
+    "social": "node scripts/social.mjs"
+  },
+  "dependencies": {
+    "ethers": "6.17.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@fontsource/ibm-plex-mono": "5.2.7",
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.4",
+    "typescript": "5.9.3",
+    "vite": "7.3.1",
+    "tsx": "4.21.0",
+    "@playwright/test": "1.58.2",
+    "@axe-core/playwright": "4.11.1"
+  }
+}

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta
+      name="description"
+      content="imd/acc Sepolia test run 2. Track trading cashback in staked IMD, apply for a project listing, and test your integration."
+    />
+    <meta property="og:title" content="imd/acc · Sepolia test run 2" />
+    <meta
+      property="og:description"
+      content="Trading cashback in staked IMD. The app and integration docs for Sepolia test run 2."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="./og.png" />
+    <title>imd/acc · Sepolia test run 2</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link
+      rel="preload"
+      href="./fonts/ibm-plex-mono-latin-400-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <script>
+      (() => {
+        let saved;
+        try {
+          saved = localStorage.getItem("imd-acc-theme");
+        } catch {}
+        const theme =
+          saved === "light" || saved === "dark"
+            ? saved
+            : matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]').content =
+          theme === "dark" ? "#000000" : "#ffffff";
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-Ct3uVuGA.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/react-DS5UYnvf.js">
+    <link rel="modulepreload" crossorigin href="./assets/ethers-CeQebH77.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-92O0W8B9.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript
+      >Enable JavaScript to load Sepolia data and connect your wallet. The
+      integration guide is also available in
+      <a href="./llms.txt">llms.txt</a>.</noscript
+    >
+  </body>
+</html>

@@ -1,0 +1,337 @@
+{
+  "mode": "live",
+  "checkedAt": "2026-10-11T11:42:42.958Z",
+  "live": [
+    "Data at block 11,891,489\nRefresh",
+    "Docs anchor, llms.txt and copy agent guide passed.",
+    "Remembered theme, reduced motion and keyboard skip link exercised.",
+    "Keyboard tab navigation passed.",
+    "Read-error state disables writes, and Retry recovers live data."
+  ],
+  "fork": [],
+  "errors": [],
+  "accessibility": [
+    {
+      "width": 360,
+      "theme": "light",
+      "route": "#/",
+      "violations": []
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "route": "#/docs",
+      "violations": []
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "route": "#/",
+      "violations": []
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "route": "#/docs",
+      "violations": []
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "route": "#/",
+      "violations": []
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "route": "#/docs",
+      "violations": []
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "route": "#/",
+      "violations": []
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "route": "#/docs",
+      "violations": []
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "route": "#/",
+      "violations": []
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "route": "#/docs",
+      "violations": []
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "route": "#/",
+      "violations": []
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "route": "#/docs",
+      "violations": []
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "route": "#/",
+      "violations": []
+    },
+    {
+      "width": 1280,
+      "theme": "light",
+      "route": "#/docs",
+      "violations": []
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "route": "#/",
+      "violations": []
+    },
+    {
+      "width": 1280,
+      "theme": "dark",
+      "route": "#/docs",
+      "violations": []
+    }
+  ],
+  "measurements": [
+    {
+      "route": "#/",
+      "width": 360,
+      "scroll": 360,
+      "theme": "light",
+      "headerHeight": 54,
+      "heading": "18px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 368.9375
+    },
+    {
+      "route": "#/docs",
+      "width": 360,
+      "scroll": 360,
+      "theme": "light",
+      "headerHeight": 54,
+      "heading": "18px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 0
+    },
+    {
+      "route": "#/",
+      "width": 360,
+      "scroll": 360,
+      "theme": "dark",
+      "headerHeight": 54,
+      "heading": "18px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 368.9375
+    },
+    {
+      "route": "#/docs",
+      "width": 360,
+      "scroll": 360,
+      "theme": "dark",
+      "headerHeight": 54,
+      "heading": "18px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 0
+    },
+    {
+      "route": "#/",
+      "width": 390,
+      "scroll": 390,
+      "theme": "light",
+      "headerHeight": 54,
+      "heading": "18px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 368.9375
+    },
+    {
+      "route": "#/docs",
+      "width": 390,
+      "scroll": 390,
+      "theme": "light",
+      "headerHeight": 54,
+      "heading": "18px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 0
+    },
+    {
+      "route": "#/",
+      "width": 390,
+      "scroll": 390,
+      "theme": "dark",
+      "headerHeight": 54,
+      "heading": "18px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 368.9375
+    },
+    {
+      "route": "#/docs",
+      "width": 390,
+      "scroll": 390,
+      "theme": "dark",
+      "headerHeight": 54,
+      "heading": "18px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 0
+    },
+    {
+      "route": "#/",
+      "width": 768,
+      "scroll": 768,
+      "theme": "light",
+      "headerHeight": 64,
+      "heading": "22px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 378.859375
+    },
+    {
+      "route": "#/docs",
+      "width": 768,
+      "scroll": 768,
+      "theme": "light",
+      "headerHeight": 64,
+      "heading": "22px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 0
+    },
+    {
+      "route": "#/",
+      "width": 768,
+      "scroll": 768,
+      "theme": "dark",
+      "headerHeight": 64,
+      "heading": "22px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 378.859375
+    },
+    {
+      "route": "#/docs",
+      "width": 768,
+      "scroll": 768,
+      "theme": "dark",
+      "headerHeight": 64,
+      "heading": "22px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 0
+    },
+    {
+      "route": "#/",
+      "width": 1280,
+      "scroll": 1280,
+      "theme": "light",
+      "headerHeight": 64,
+      "heading": "22px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 378.859375
+    },
+    {
+      "route": "#/docs",
+      "width": 1280,
+      "scroll": 1280,
+      "theme": "light",
+      "headerHeight": 64,
+      "heading": "22px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 0
+    },
+    {
+      "route": "#/",
+      "width": 1280,
+      "scroll": 1280,
+      "theme": "dark",
+      "headerHeight": 64,
+      "heading": "22px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 378.859375
+    },
+    {
+      "route": "#/docs",
+      "width": 1280,
+      "scroll": 1280,
+      "theme": "dark",
+      "headerHeight": 64,
+      "heading": "22px",
+      "fonts": [
+        "400:loaded",
+        "500:loaded",
+        "600:loaded"
+      ],
+      "connect": 0
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "chainId": 11155111,
+  "sourceCommit": "ef39dd18d1c65faaaa49c0a4a3f162960d594f18",
+  "contracts": [
+    {
+      "name": "Stacker",
+      "address": "0x0457276d7b036818b3eddc1a4a3fceda61e9314d",
+      "txHash": "0x7a2d1e791756e5ce9a28408c8f141ccf6b669e824e54095d0328c31d364b9a60",
+      "blockNumber": 11891109,
+      "creationCodeHash": "6fc69b87eec0f874ab88a4e3ff7513a35d8d6fb6cd379fa517dc41bc03fea6b2",
+      "abiHash": "3ad4d4dc48c1151d15761cc1702132efdebd29256fff2fd8b4fca37532cbb640"
+    },
+    {
+      "name": "ProjectRegistry",
+      "address": "0x3a3bfcb65614292b0ec7c62f9e3a5dac003b920e",
+      "txHash": "0x7a2d1e791756e5ce9a28408c8f141ccf6b669e824e54095d0328c31d364b9a60",
+      "blockNumber": 11891109,
+      "creationCodeHash": "af96cb7c212dbc50831eea024c58506f228875b1feb683612f10313a2f815cfa",
+      "abiHash": "99f136e9891dd024a34966657049bd24af8d796abe38964792bed12094a2f53e"
+    }
+  ]
+}

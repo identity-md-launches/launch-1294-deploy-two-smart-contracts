@@ -1,63 +1,135 @@
-# imd/acc Sepolia test site
+# imd/acc Sepolia test run 2 site
 
-A static page with no build step, package manager, CDN scripts, or server dependency. Serve this directory over HTTP(S), for example `python3 -m http.server 8080 --directory site`. Publishing is the platform's release-setting step; this builder does not publish or deploy anything.
+The app is `#/`; the documentation is `#/docs`. The published artifact is
+[`../dist/`](../dist/), including `llms.txt`, local fonts, favicon and social
+image. It needs only a static HTTP server. No backend, keys, runtime npm
+registry or contract deployment is needed.
 
-## Deployment handoff
+## Install and rebuild
 
-No `deployment.json` is shipped before deployment. The page shows an awaiting-deployment state and disables transactions. It never substitutes launch #1129's Stacker or guessed contract addresses.
+Requires Node.js 22.12+ (validated with Node 24.21.0) and npm. React,
+TypeScript, Vite and ethers are pinned in this directory's manifest and
+lockfile. The repository's Solidity build configuration is unchanged.
 
-After the platform deploys the two contracts, pass its confirmed information to `node site/configure.mjs /path/to/confirmed-sepolia-handoff.json`. This is a read-only network verification followed by writing `site/deployment.json`. The handoff object has:
+Build in a disposable directory so no dependency or cache directories enter
+the submission. Run these commands from the repository root:
 
-- `chainId`: numeric `11155111`.
-- `contracts`: exactly two entries, in the order `Stacker`, `ProjectRegistry`.
-- Each entry has `contract`, `address`, numeric `blockNumber`, and `transactionHash`, all from the confirmed platform receipt. When both contracts are created in one factory transaction, both entries share the block and transaction hash.
-
-The script and page reject missing/zero addresses, failed receipts, the wrong network, historical code predating the supplied deployment block, and unexpected contract wiring. Both names and addresses must be supplied by the platform's actual handoff. The page must be published with the generated file beside `index.html`. The supplied root `launch.json` remains untouched and is not website configuration.
-
-The live dependencies are fixed to the approved Sepolia table in `core.mjs`. New deployment addresses are fully external to the app until confirmed. Do not add keys or deployment scripts.
-
-## User flows
-
-- Connect an injected EIP-1193 wallet and switch/add Sepolia. Every write explicitly carries `chainId: 11155111`, even during wallet confirmation; account/network guards run before each transaction.
-- Claim staking TestIMD with `faucet()`, view `nextFaucetAt`, approve exactly the amount entered, and call `credit(self, amount)`. This is direct staking and earns zero listing points.
-- Separately mint 10 **oracle** test IMD with `mint(self, 10e18)` on `0x44a1…f89a`. The staking token `0x2b69…1e82` cannot pay Intake fees.
-- Apply with project, name, HTTPS source URL, 25–100 bps and beneficiary. Read the current `ORACLE_FEE()`, approve exactly it, then submit.
-- Challenge with a reason, the beneficiary being contested, and an exact fee-plus-bond approval. “Review this project” fills the beneficiary for review. The page calls `challengeForBeneficiary(project, reason, expectedBeneficiary)`: a different beneficiary before inclusion reverts before any fee or bond is pulled. It never silently replaces the user’s beneficiary choice. Listed status, open question and cooldown are checked first.
-- Clear an unanswered request once the Intake completed it or the one-day deadline passed.
-- Wallet and project totals, current vault balances/value, listing periods, all-time leaderboards, pending outcomes and recent stacks update on refresh or every 30 seconds. Transaction gas is the wallet estimate multiplied by 1.3.
-
-## Counting and trust
-
-All arithmetic uses `bigint`. Vault share decimals are read from the vault (24 on this test vault); token and points amounts use 18 decimals. Cashback value prices all received shares, including those already transferred/redeemed; the separate current balance avoids confusing that history with present holdings.
-
-Logs are read in bounded chunks from each contract's confirmed deployment block, with endpoint failover and smaller ranges on RPC rejection. A failed or reorganized scan is visibly stale, never presented as a complete new leaderboard. Scans rebuild history, so removed logs are not retained in an incremental cache.
-
-The displayed rate is the historical application rate. Challenges check the rate currently in force within 25–100 bps and retain the fee guard; a lawful rate change alone does not delist a project.
-
-Each listing epoch is `[fromBlock, toBlock)`, or open-ended while listed. Previous eligible points survive delisting; relisting starts another epoch. Applications and challenges do not create eligibility themselves. Direct and unlisted stacks have no points. **This test page counts listing eligibility; it does not verify each project's swap logs, fee funding, or exact per-trade rate.** A production rewards indexer must add project-specific trade reconciliation. The page labels these as listing points and promises no rewards.
-
-The Stacker and registry have no owner, but the reused TestSIMD vault owner can pause deposits/withdrawals and sweep all staked test IMD. Any positive deposit to a trader, including a third-party dust deposit sent directly to the vault, stamps its one-block redemption hold. Repeated incoming deposits can delay exits; the page explains this beside the staking form.
-
-The registry blocks beneficiary transfers while a challenge is open. For API compatibility, `challenge(project, reason)` remains available only until the first actual beneficiary handoff; after one it always reverts `BeneficiaryPinRequired`, even if the old wallet is restored or the project relists. New integrations should always use `challengeForBeneficiary`.
-
-The single-open-request model permits spam and front-running. Defending a challenge no longer buys a new cooldown, but does not guarantee fair ordering. If Intake retires the action or the signer changes, a new registry and an explicit old-registry cutoff are needed; this page does not invent a migration rule.
-
-## Local checks
-
-```
-forge build
-node --test site/test/core.test.mjs site/test/app.test.mjs
-node site/test/browser.mjs /path/to/chrome
+```sh
+site_build_dir="$(mktemp -d /tmp/imd-acc-site.XXXXXX)"
+cp -R site/. "$site_build_dir/"
+npm ci --prefix "$site_build_dir" --cache /tmp/imd-acc-npm-cache
+npm run typecheck --prefix "$site_build_dir"
+npm test --prefix "$site_build_dir"
+npm run build --prefix "$site_build_dir" -- --outDir "$PWD/dist"
 ```
 
-The first Node suite tests ABI compatibility against Foundry output, fee-token separation, real app event handlers with a simulated DOM/wallet/RPC, exact approvals, wallet network changes, point boundaries and relisting, deployment validation and incomplete RPC history. All synthetic addresses exist only in tests. No test uses a real wallet key or broadcasts a transaction.
+The build verifies both canonical ABI hashes, runs TypeScript, and exports
+Vite's production output. `base: './'` gives relative asset URLs. Building
+replaces only `dist/`. No Foundry dependencies are installed or changed.
 
-The optional Chrome runner uses a fresh disposable profile, local server and mocked RPC/wallet, and checks a 360px viewport and the same flows. It requires an installed Chrome/Chromium that can start in the host environment. Chrome here aborts while registering with macOS before loading a page, so visual/mobile rendering and a real extension wallet remain release smoke checks. The DOM tests do not claim to prove browser layout. Live Sepolia contract behavior was tested separately through local Foundry forks.
+For normal development in a separate working copy, `cd site`, `npm ci`,
+`npm run dev`, and `npm run build` work too. Never include generated
+`node_modules`, npm caches or dependency archives in a submission.
 
-After deployment/publication the platform should open the page in a real browser, verify the shown release addresses, then use a test wallet to claim, stack, mint oracle IMD and submit an application. This worker deliberately does not conduct these broadcasts.
+## Preview
 
-## Vendored code
+From the repository root:
 
-`vendor/ethers-6.17.0.mjs` is the self-contained ESM build from the npm `ethers` 6.17.0 distribution, MIT license in `vendor/ethers-LICENSE.md`. SHA-256 `b016b0c3898c78fd8156466eb1ff1f42c9df951c2f0d64c9bdf799fe745b0a6c`.
+```sh
+python3 -m http.server 4173 --bind 127.0.0.1 --directory dist
+```
 
-`test/vendor/linkedom-0.18.12.mjs` is the self-contained `worker.js` DOM implementation from npm `linkedom` 0.18.12, used only by offline tests. Its MIT license is adjacent. SHA-256 `196efeb17c260e001979dbc54a3c30e701a881c6e8a3eedaddc5ad83c99ee5ff`. Neither library requires downloading anything during verification or site loading. Existing project configuration and dependency directories are unchanged.
+Open `http://127.0.0.1:4173/#/`, `http://127.0.0.1:4173/#/docs` and
+`http://127.0.0.1:4173/llms.txt`. Serve over HTTP rather than opening the HTML
+as a `file:` URL. Wallet actions use an injected EIP-6963 or legacy provider.
+The wallet must be on Sepolia and have Sepolia ETH for gas.
+
+## Publish
+
+Publish the complete contents of `dist/` to a static host or IPFS directory.
+Keep the `assets/` and `fonts/` directories beside `index.html`; no rewrite
+rules or rebuild are needed. Hash routes work at a gateway subpath. In the
+IdentityMD contributor flow, the committed export is the publishing input;
+this assignment does not invoke a publishing command. `og:image` is relative
+because the final host name is assigned after submission.
+
+## Data and transactions
+
+- Stacker and ProjectRegistry are copied from the verified launch handoff in
+  `src/deployment.json`, source commit
+  `ef39dd18d1c65faaaa49c0a4a3f162960d594f18`, deployment block 11,891,109.
+- Full ABIs in `src/abi/` were generated from the unchanged Solidity sources
+  with solc 0.8.26. Both canonical ABI hashes and creation bytecode hashes
+  match the handoff. `scripts/verify-abi.mjs` checks the ABI hashes at build.
+- Before enabling writes, the app verifies chain ID, code at deployment and
+  now, absence of code before deployment, the successful deployment receipt,
+  and Stacker/registry/vault dependency wiring.
+- Reads fall back in order: ethpandaops, sentio, publicnode. Logs are scanned
+  in chunks of at most 1,000 blocks, reduced on provider range-limit errors.
+  A failed scan never becomes a partial leaderboard. Reads share a block
+  tag. The cache rescans the last 12 blocks and is invalidated on a changed
+  previous block hash; the completed snapshot's hash is checked again.
+- All registry events reconstruct listing periods. Points use
+  `fromBlock <= event.block < toBlock`; open periods have no upper bound.
+  Current wallet shares are separate from event shares used for value.
+- Open questions trigger a 15-second refresh. Otherwise data refreshes each
+  minute. Every confirmed transaction triggers a refresh. The loaded block
+  is visible. A refresh failure retains clearly marked old data and
+  disables writes until a successful refresh.
+- Each action estimates gas and sends the estimate multiplied by 1.3,
+  rounded up. Account/network are checked before estimation and signing.
+  Application and challenge preflight checks run again before sending.
+  Approvals use exactly the current oracle fee (plus bond for challenges).
+- The agent guide in `public/llms.txt` is imported verbatim into the docs;
+  it is also copied unchanged to `dist/llms.txt`.
+
+## Validation
+
+Actual results, review findings, screenshots, commands and limitations are
+in [`validation/VALIDATION.md`](validation/VALIDATION.md). The final
+production build, typecheck and 12 focused tests pass. Browser validation
+uses the production export at a subpath, live Sepolia reads, and a local
+Sepolia fork for transactions. No live-chain transaction was sent.
+
+The browser test checks both pages at 360, 390, 768 and 1280 pixels, both
+light and dark themes, overflow, local fonts, axe accessibility findings,
+keyboard tabs and skip link, remembered theme, docs anchors and agent guide
+copy/download. With a local fork it also checks wallet discovery, chain
+switch, signature rejection, faucet, approval, credit, application and
+expiry. Test accounts are generated and funded only on that fork.
+
+To repeat it, preview the production export, install a Playwright Chromium
+browser in the disposable build environment, and run:
+
+```sh
+PREVIEW_URL=http://127.0.0.1:4173/ npm run test:browser --prefix "$site_build_dir"
+```
+
+Set `CHECK_MODE=live` or `CHECK_MODE=fork` to run the two groups separately. The fork mode requires `FORK_RPC`. Set `CHROMIUM_PATH` to an existing Chromium executable if needed. Evidence
+is written under `/tmp/imd-acc-browser-evidence` by default; `EVIDENCE_DIR`
+can select another temporary output directory.
+
+For the transaction checks, start an isolated local fork in another terminal:
+
+```sh
+anvil --fork-url https://rpc.sepolia.ethpandaops.io \
+  --chain-id 11155111 --port 8547 --silent
+```
+
+Then run the same browser test with `FORK_RPC=http://127.0.0.1:8547`.
+**Use only a local Anvil fork for this variable.** The test impersonates a
+fresh account, funds it locally and advances local time for expiry. It uses
+an existing non-trading contract to test application prechecks, not panel
+eligibility. It deploys no contracts and sends no transaction to Sepolia.
+
+The optional social image can be rebuilt with `npm run social` in the
+build directory, using the same Chromium setup. Its source uses the local
+IBM Plex Mono font. The generated `public/og.png` is included already.
+
+## Design and licenses
+
+[`../DESIGN.md`](../DESIGN.md) records the implemented tokens, type scale,
+components and responsive behavior. The pinned Better Interface guide was
+applied across accessibility, layout, writing, typography, colors and UI.
+See [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) for bundled software,
+font and design-guidance attribution.

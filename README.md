@@ -1,12 +1,12 @@
 # imd/acc
 
-**Launch adaptation:** see [ADAPTATION.md](ADAPTATION.md) for reproduced audit findings, fixes, tests and remaining release steps. The new static Sepolia page is in [site/](site/README.md); its contract addresses come only from the platform deployment handoff.
+**Launch adaptation:** see [ADAPTATION.md](ADAPTATION.md) for reproduced audit findings, fixes, tests and remaining release steps. The Sepolia test run 2 app and docs are in [site/](site/README.md), with the complete static export in [dist/](dist/). See [DESIGN.md](DESIGN.md) and the [validation record](site/validation/VALIDATION.md). Its launch addresses come from the verified deployment handoff.
 
 **Trading cashback in staked IMD.** Every trade in a participating project sends part of the trade, between 0.25% and 1% at the project's choice, back to the trader as sIMD, IMD's staking-vault share, deposited straight into the trader's wallet, where it keeps earning the vault's yield.
 
 | | |
 |---|---|
-| **Status** | Live on Sepolia (launch #1129). First integration, PLEA, live there too. Next: Sepolia test run 2 with the new Stacker and the on-chain ProjectRegistry, then mainnet. |
+| **Status** | Sepolia test run 2 contracts are live (launch #1294), with the app and docs exported in `dist/`. The earlier launch #1129 and PLEA deployment remain historical below. |
 | **Test page** | https://imd-acc-sepolia-test-run.site.identitymd.eth.limo |
 | **Contract code** | [`src/Stacker.sol`](src/Stacker.sol) (the cashback funnel) and [`src/ProjectRegistry.sol`](src/ProjectRegistry.sol) (the oracle-decided project list) in this repository. The first Sepolia launch's code, built and deployed by the [IMD swarm](https://imd.fun), is in the [launch-1129 repository](https://github.com/identity-md-launches/launch-1129-build-imd-acc-sepolia-test). |
 
@@ -71,9 +71,23 @@ event Stacked(address indexed project, address indexed trader, uint256 imd, uint
 | Failures | Reverts and moves nothing if the vault is paused, the allowance or balance is short, the trader is zero, or the vault would mint 0 shares. A 0 amount returns 0 with no event. |
 | Safety | `nonReentrant`, OpenZeppelin `SafeERC20`, no owner or admin functions at all. |
 
-Source: [`src/Stacker.sol`](src/Stacker.sol). The Sepolia Stacker is the same contract, plus per-trader totals on chain (`traderStacked`, `stackedBy`, `traderShares`) and the constructor checks without the empty-chain case.
+Source: [`src/Stacker.sol`](src/Stacker.sol). The earlier launch #1129 Sepolia Stacker also kept per-trader totals on chain (`traderStacked`, `stackedBy`, `traderShares`) and used constructor checks without the empty-chain case. Sepolia test run 2 uses the current event-based contract above.
 
 ## Deployments
+
+### Sepolia test run 2 (launch #1294, block 11,891,109)
+
+| Contract | Verified launch address |
+|---|---|
+| Stacker | [`0x0457276d7b036818b3eddc1a4a3fceda61e9314d`](https://sepolia.etherscan.io/address/0x0457276d7b036818b3eddc1a4a3fceda61e9314d) |
+| ProjectRegistry | [`0x3a3bfcb65614292b0ec7c62f9e3a5dac003b920e`](https://sepolia.etherscan.io/address/0x3a3bfcb65614292b0ec7c62f9e3a5dac003b920e) |
+
+Both use the existing TestIMD and TestSIMD below. The registry pays the
+separate oracle fee token `0x44a1cd38474fb1748400e7deb5f8d786cce3f89a` to
+Intake v2 `0xa43e6f75ee006411f79ac1c84120606c2330de82`.
+This website assignment changes no contracts and deploys none.
+The current static app is `dist/index.html`, with documentation at `#/docs`
+and the same agent integration context in `dist/llms.txt`.
 
 ### Sepolia (live, launch #1129, block 11,874,601)
 
@@ -201,6 +215,8 @@ NEXT_SESSION.md           the brief for the next working session
 ```
 
 ## Build and test
+
+For the frontend, follow [site/README.md](site/README.md) to install the pinned dependencies in a temporary directory, preview, typecheck, test, rebuild and publish the complete `dist/` export. The export requires no runtime dependency installation.
 
 With [Foundry](https://getfoundry.sh) 1.8.3, the version IMD's verifier runs:
 

@@ -1,0 +1,80 @@
+{
+  "limitBytes": 8388608,
+  "candidateBytesBeforeThisSmallReport": 3913444,
+  "existingGitPackKiB": 579,
+  "conservativeBytesIncludingExistingPacks": 4506340,
+  "productionExportBytes": 651043,
+  "candidateFileCount": 184,
+  "noDependencyOrCacheDirectories": true,
+  "noDependencyArchives": true,
+  "ignoreFilesChanged": false,
+  "contractsOrExistingBuildConfigurationChanged": false,
+  "submodules": 0,
+  "export": [
+    {
+      "path": "dist/THIRD-PARTY-NOTICES.txt",
+      "bytes": 3281,
+      "sha256": "eaba3d60f880d42f4cd534c741cb22ad324227d6b1594246949c04eafa3490db"
+    },
+    {
+      "path": "dist/assets/ethers-CeQebH77.js",
+      "bytes": 261457,
+      "sha256": "ba3c8131d9f9ab23ebb1a90496790f739443fca92a2856173e2d0f12a95d54c0"
+    },
+    {
+      "path": "dist/assets/index-92O0W8B9.css",
+      "bytes": 11838,
+      "sha256": "86ecc1426ee59704c8d27367c8fb0daa417675819d3401316e3da0486bbd8d67"
+    },
+    {
+      "path": "dist/assets/index-Ct3uVuGA.js",
+      "bytes": 271646,
+      "sha256": "92bb61b96006ff3dfc79cb041915f756cdfa1a2d1180c23a33fab35f74859327"
+    },
+    {
+      "path": "dist/assets/react-DS5UYnvf.js",
+      "bytes": 11213,
+      "sha256": "7290d6b05e0e99bc60a82ce920c17e0d9c775e41e23ddb3505a61b1cd66b3069"
+    },
+    {
+      "path": "dist/favicon.svg",
+      "bytes": 231,
+      "sha256": "3ae1f5108b4bdbaef5189b02220041a9b8293bd2c022dbf2b9a110fc6f646d0c"
+    },
+    {
+      "path": "dist/fonts/OFL.txt",
+      "bytes": 5299,
+      "sha256": "23b0a9d0c6d3f140a0b77e483c5cfa6bba574325ef5cb189ed9f2fec4884533f"
+    },
+    {
+      "path": "dist/fonts/ibm-plex-mono-latin-400-normal.woff2",
+      "bytes": 14708,
+      "sha256": "08949f728dc52d528e69b1667d15c89a5686a4ee9a296ff90983985f99c380f7"
+    },
+    {
+      "path": "dist/fonts/ibm-plex-mono-latin-500-normal.woff2",
+      "bytes": 14888,
+      "sha256": "01d285447409c8a588692162439a038b8cbd7871309ee20267b0d2d91c6e8e22"
+    },
+    {
+      "path": "dist/fonts/ibm-plex-mono-latin-600-normal.woff2",
+      "bytes": 15620,
+      "sha256": "0d1f0b8d0722224e32e9f28261bdc86c79115be73444ae5eceb73976a1bcdf83"
+    },
+    {
+      "path": "dist/index.html",
+      "bytes": 2079,
+      "sha256": "3e98517a9bf62ae5c23e14b566b1d763e25b29135d7ad4e9de3cf51c0ce7ce12"
+    },
+    {
+      "path": "dist/llms.txt",
+      "bytes": 8979,
+      "sha256": "b50d4e0538bed11dbf13770ae0f2ff1f10407da588d54e0b47ec87fd958c2fa0"
+    },
+    {
+      "path": "dist/og.png",
+      "bytes": 29804,
+      "sha256": "f14ef524a214affc7a62715ad5f3f6f9f868dc51ec636bee91343b296548d64c"
+    }
+  ]
+}
