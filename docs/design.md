@@ -16,18 +16,52 @@ The [README](../README.md) is the overview. This file keeps the design detail an
 
 Anyone can call `credit` with their own IMD. That is just staking for someone, and it can't be blocked without giving the Stacker an owner. So points are counted, not gated: the Stacker records everything, and only credits from **listed projects** earn points. Every `Stacked` event names its project, so the list can be applied at any time.
 
-**v1 (decided): a project list in the site.** The test page ships a `projects.json` (`{address, name, fromBlock}`). Credits from anything else show as "direct, no points". Real trading points already cost money (fees paid to trade), so the only cheap attack was a fake project, and the list closes it.
+**Today (decided): a list file.** Credits from anything not on the list show as "direct, no points". Real trading points already cost money (fees paid to trade), so the only cheap attack was a fake project, and the list closes it. The first test page shipped its own `projects.json`; from Sepolia test run 2 the list is a file in this repository, `listings/<chain>.json`, so a listing is a commit, not a paid job. How a project applies, the checklist, the fee guard and delisting with `toBlock` are in [listing.md](listing.md).
 
-**Points start at listing.** A listed project's credits earn points only from its `fromBlock`, never retroactively, so nobody can build fake history and then get approved. PLEA's `fromBlock` is its hook's deploy block.
+**Points start at listing.** A listed project's credits earn points only from its `fromBlock`, never retroactively, so nobody can build fake history and then get approved. A project reviewed before or at launch gets its deploy block (PLEA's case).
 
-**Later: the IMD panel decides the list.** The site file is replaced by a small `ProjectRegistry` contract with no owner:
-1. **Apply.** A project calls `apply(project, name, sourceUrl)` and pays the oracle fee (0.5 IMD, plus any application fee we decide).
-2. **The panel votes.** The registry sends an IMD oracle request (`answerType: bool`, a panel like PLEA's) asking: "Is this contract a real trading project that pays imd/acc cashback out of fees its traders pay? Its source must be verified; reject wallets, contracts that just call `credit` with their own IMD, and wash-trading setups."
-3. **Listed.** The verdict comes back signed. The registry checks it the same way PLEA's gate does (EIP-712, the oracle signer, the recomputed `questionHash`), then sets `listed[project] = true` and emits `Listed`.
-4. **Delisting.** Anyone can challenge a listed project for a fee. The panel votes again, and a lost vote emits `Delisted`.
-5. **Points** count credits from listed projects, from the listing block until any delisting, never before.
+**Later: the IMD panel decides the list** through the ProjectRegistry, below. The Stacker never changes.
 
-The Stacker never changes. The site and any future token snapshot read the registry instead of `projects.json`, and PLEA's gate code already contains the verifier the registry needs. Oracle payments go through IMD's Intake v2, `0xa43e6f75ee006411f79ac1c84120606c2330de82`, at the same address on Ethereum, Sepolia and Robinhood Chain. Its `requestWithFailure` reports a refused or split panel, which the registry can use to clear a pending application, never to move value. The registry would ship as its own small `evm_contracts` job, once more than one or two projects want in.
+## The ProjectRegistry
+
+**Planned (2026-10-11); its first trial runs on Sepolia with PLEA.** A small contract with **no owner** replaces the list file, so nobody decides alone. **Nothing is redeployed:** the Stacker doesn't know about listings, so the site and the indexer read the registry's events instead of the file. The registry ships as its own small `evm_contracts` job.
+
+**Oracle: IMD's Intake v2**, `0xa43e6f75ee006411f79ac1c84120606c2330de82`, the same address on Ethereum, Sepolia and Robinhood Chain (code checked on Sepolia and mainnet, 2026-10-11). It keeps every v1 function and adds `requestWithFailure(action, body, callback, onFailure, asset, amount)`, which also reports when the panel gives no answer. Callback gas: 200,000 on mainnet, 1,000,000 on Sepolia (`callbackGas()`, read 2026-10-11).
+
+**Stored per project:** status (none, pending, listed, rejected, delisted), name, source URL, `rateBps`, beneficiary, `fromBlock`, `toBlock`, and the pending oracle request id.
+
+**1. Apply.** `apply(project, name, sourceUrl, rateBps, beneficiary)` pays the oracle fee (0.5 IMD) and sends the question with `requestWithFailure`. One pending application per project at a time. The question and its hash are computed here, not in the callback.
+
+> Is `<project>` on `<chain>` a real trading project whose verified source pays imd/acc cashback through `Stacker.credit`, out of fees its traders pay, at `<rateBps>` of each trade (25 to 100), with the part of its fee that really leaves the project at least as large as the cashback? Reject wallets, contracts that credit their own IMD, and wash-trading setups.
+
+Evidence: the verified source URL, the address and chain, the stated rate and beneficiary. `answerType: bool`, a panel like PLEA's.
+
+**2. Answer (callback, status 0).**
+- Only Intake v2 may call it, and only for the pending request id.
+- It checks the signed attestation the way PLEA's gate does: EIP-712 domain "IdentityMD Oracle" version 2 with this chain and contract, the oracle signer `0x5598aa9146215bc13eb26f2c692ad1461fd32982`, and the question hash stored at apply time.
+- **Yes:** listed, `fromBlock` = this block, event `Listed`. **No:** rejected, event `Rejected`; the project may apply again.
+- It stores the verdict and nothing more, so it fits the 200k gas mainnet gives callbacks.
+
+**3. No answer (failure callback, status 1 refused or 2 no agreement).**
+- `onFailure(requestId, status, reason, agreed, answered, signature)` from Intake v2, for our pending id only, clears the pending application, so the project can apply again at once.
+- Failures are not signed yet (IMD dev, 2026-10-11), so a failure **never** lists, delists or moves value. The oracle fee is spent either way.
+- This replaces the manual clear PLEA needed when plea #3 split the panel.
+
+**4. Challenge.** Anyone calls `challenge(project, reason)` and pays the oracle fee. The panel answers "does this listed project still meet the rules?" **No:** delisted, `toBlock` = this block, event `Delisted`; earlier points stay. A failure only clears the pending challenge. One pending challenge per project.
+
+**Open details:**
+- Who may apply for a project. **Recommendation:** anyone, one pending at a time; each application costs its sender 0.5 IMD, and the panel rejects wrong data.
+- An application fee on top of the oracle fee, and a challenge bond against spam.
+- One registry per chain, or one on Ethereum listing projects on every chain.
+- The oracle fee token on Sepolia: on 2026-10-09 it was the test IMD `0x44a1cd38474fb1748400e7deb5f8d786cce3f89a`, which anyone can mint. Confirm with Intake v2 before building.
+
+**Sepolia trial with PLEA:**
+1. Deploy the registry on Sepolia, wired to Intake v2.
+2. PLEA's next version, crediting through the Stacker of test run 2, applies at 50 bps with its beneficiary. Expected: yes.
+3. Negative cases: a plain wallet, and a contract that credits its own IMD. Expected: no.
+4. A no-answer case, to see the failure callback clear the application.
+5. A challenge against PLEA. Expected: it stays listed.
+6. The test page reads the registry instead of `listings/sepolia.json`.
 
 ## Points now, token maybe later
 
