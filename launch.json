@@ -1,0 +1,13 @@
+{
+  "kind": "evm_contracts",
+  "contracts": [
+    {
+      "contract": "Stacker",
+      "constructorArgs": [
+        "0xD34a99Bc0f67aE1bbd63C660e6d0b0dd03E263B7",
+        "0x9Efa934D9fAd4AE28c998a40195646b965a97247"
+      ]
+    }
+  ],
+  "notes": "imd/acc on Ethereum mainnet: one contract, the Stacker, against the live IMD token and the live StakedIMD (sIMD) vault. No owner, admin, fee, pause or upgrade. credit(trader, imdAmount) pulls IMD from the calling project and calls sIMD.deposit(imdAmount, trader), so the shares go straight to the trader, then emits Stacked(project, trader, imd, shares). The constructor checks sIMD.asset() == IMD and approves the vault once; both run only where the vault has code, so the empty-chain rehearsal passes. TestIMD and TestSIMD under test/mocks are test doubles and are not deployed."
+}

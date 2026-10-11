@@ -4,9 +4,9 @@
 
 | | |
 |---|---|
-| **Status** | Live on Sepolia (launch #1129). First integration, PLEA, live there too. Mainnet launch ready. |
+| **Status** | Live on Sepolia (launch #1129). First integration, PLEA, live there too. Mainnet Stacker written and tested here; launch ready. |
 | **Test page** | https://imd-acc-sepolia-test-run.site.identitymd.eth.limo |
-| **Contract code** | [launch-1129 repository](https://github.com/identity-md-launches/launch-1129-build-imd-acc-sepolia-test) (built and deployed by the [IMD swarm](https://imd.fun)) |
+| **Contract code** | [`src/Stacker.sol`](src/Stacker.sol) in this repository (the mainnet version). The Sepolia launch's code, built and deployed by the [IMD swarm](https://imd.fun), is in the [launch-1129 repository](https://github.com/identity-md-launches/launch-1129-build-imd-acc-sepolia-test). |
 
 ## Contents
 
@@ -19,7 +19,8 @@
 7. [Projects](#projects)
 8. [Roadmap](#roadmap)
 9. [Repository layout](#repository-layout)
-10. [Credits](#credits)
+10. [Build and test](#build-and-test)
+11. [Credits](#credits)
 
 ## Why imd/acc
 
@@ -61,12 +62,13 @@ event Stacked(address indexed project, address indexed trader, uint256 imd, uint
 | Project | `msg.sender`. Any contract or wallet can call `credit`; [points](#points) decide who counts. |
 | Flow | Pulls `imdAmount` IMD from the caller, then calls `sIMD.deposit(imdAmount, trader)`. |
 | Holds nothing | 0 IMD and 0 sIMD between calls (tested as an invariant). |
-| Fixed | IMD and sIMD addresses are immutable; the constructor checks `sIMD.asset() == IMD`. |
-| Totals | `traderStacked`, `projectStacked`, `stackedBy[project][trader]`, `totalStacked`, `traderShares`, `projectShares`. |
+| Fixed | IMD and sIMD addresses are immutable; the constructor checks `sIMD.asset() == IMD` and approves the vault once. Both are skipped only where the vault has no code (IMD's empty-chain launch rehearsal); such a Stacker can't move any IMD. |
+| Totals on chain | Per project (`projectStacked`, `projectShares`) and in total (`totalStacked`). |
+| Per trader | From the `Stacked` events, which record project, trader, IMD and shares for every credit. Storing them on chain too would cost every trader extra gas, so the mainnet Stacker doesn't. |
 | Failures | Reverts and moves nothing if the vault is paused, the allowance or balance is short, the trader is zero, or the vault would mint 0 shares. A 0 amount returns 0 with no event. |
 | Safety | `nonReentrant`, OpenZeppelin `SafeERC20`, no owner or admin functions at all. |
 
-Source: [`src/Stacker.sol`](https://github.com/identity-md-launches/launch-1129-build-imd-acc-sepolia-test/blob/main/src/Stacker.sol).
+Source: [`src/Stacker.sol`](src/Stacker.sol). The Sepolia Stacker is the same contract, plus per-trader totals on chain (`traderStacked`, `stackedBy`, `traderShares`) and the constructor checks without the empty-chain case.
 
 ## Deployments
 
@@ -86,7 +88,7 @@ Test page: https://imd-acc-sepolia-test-run.site.identitymd.eth.limo. It shows y
 |---|---|---|
 | IMD | [`0xd34a99bc0f67ae1bbd63c660e6d0b0dd03e263b7`](https://etherscan.io/address/0xd34a99bc0f67ae1bbd63c660e6d0b0dd03e263b7) | Standard 18-decimal ERC-20 (a LayerZero OFT), no transfer fee. |
 | sIMD | [`0x9efa934d9fad4ae28c998a40195646b965a97247`](https://etherscan.io/address/0x9efa934d9fad4ae28c998a40195646b965a97247) | ERC-4626 staking vault. Owner renounced, so nobody can pause it or sweep its funds. |
-| Stacker | not deployed yet | Launch ready: [`jobs/4-mainnet-launch.md`](jobs/4-mainnet-launch.md). Same code as on Sepolia. |
+| Stacker | not deployed yet | Launch ready: [`jobs/4-mainnet-launch.md`](jobs/4-mainnet-launch.md), deploying [`src/Stacker.sol`](src/Stacker.sol) as listed in [`launch.json`](launch.json). |
 
 ## Points
 
@@ -96,6 +98,18 @@ Every `Stacked` event is kept as a record. Points are the basis for the leaderbo
 - **Project points:** the IMD its traders stacked.
 - **Listed projects only.** Anyone can call `credit` with their own IMD; that's just staking for someone, so it earns no points. Only credits from a listed project count, from the block it was listed (`fromBlock`), never before.
 - **The list today** is `projects.json` on the test page (`{address, name, fromBlock}`). Later, an ownerless `ProjectRegistry` decided by an IMD oracle panel replaces it ([design notes](docs/design.md#which-projects-earn-points)).
+- **How they're counted:** by adding up the `Stacked` events, which can't be changed or deleted. An indexer keeps the totals ready for the site; project totals are also on chain.
+
+**What a trader sees on the dashboard**, with no visit to the vault's site:
+
+| Figure | Where it comes from |
+|---|---|
+| Cashback received, points, split per project | their `Stacked` events |
+| sIMD held now | the vault, live |
+| What their cashback is worth today | the shares in their events, priced by the vault, live |
+| Earned on top (vault yield) | worth today − cashback received |
+
+The all-traders dashboard and leaderboards (top traders, top projects, 7-day and 30-day views) come from the same events.
 
 | Listed project | Address | From block | Status |
 |---|---|---|---|
@@ -125,8 +139,8 @@ Rules:
 
    | Network | New trader | Repeat trader |
    |---|---|---|
-   | Ethereum mainnet (fork test) | 197k–249k | 112k |
-   | Sepolia (today's expensive new storage) | 0.7M–1.2M | about 0.2M |
+   | Ethereum mainnet (this Stacker, fork test) | 130k | 96k |
+   | Sepolia (the launch #1129 Stacker; today's expensive new storage) | 0.7M–1.2M | about 0.2M |
 
    Wallets should send estimates ×1.3.
 6. **For Uniswap v4 hooks:** include the `afterSwap` logic Uniswap's frontend whitelisting expects, support the router's `msgSender`, and warn users about copycat v2/v3 pools. These are btc/acc's lessons.
@@ -137,14 +151,16 @@ Rules:
 | Project | Chain | Status |
 |---|---|---|
 | **PLEA**: a sell-gated meme token on Uniswap v4 | Ethereum (Sepolia first) | **Live on Sepolia.** Its v10 hook credits 0.5% of every PLEA/IMD trade inside the same swap, for buys and sells; new and repeat traders were stacked. PLEA mainnet will use the mainnet Stacker. |
-| **PondPad**: an IMD-paired launchpad | Robinhood Chain | Planned. The sIMD vault is on Ethereum only, so this needs a vault on Robinhood Chain, or plain-IMD cashback there until one exists. |
+| **PondPad**: an IMD-paired launchpad | Robinhood Chain | Planned. The sIMD vault is on Ethereum only, so PondPad uses the [multichain route](docs/design.md#multichain-cashback-from-other-chains): cashback waits on Robinhood Chain and is delivered to Ethereum as sIMD through IMD's own bridge. |
 
 ## Roadmap
 
 1. **List PLEA on the test page** so PLEA traders earn points. Ready and tested locally. [`jobs/3-list-plea.md`](jobs/3-list-plea.md)
-2. **Deploy the Stacker on Ethereum mainnet** against the real IMD and sIMD, with a full audit by the IMD swarm. PLEA mainnet needs its address. [`jobs/4-mainnet-launch.md`](jobs/4-mainnet-launch.md)
-3. **v2: the ETH route** for projects whose fees are in ETH. `creditETH(trader)` records pending ETH; a public `flush()` swaps the batch to IMD through POOL4 behind a TWAP price guard, deposits it and splits the shares. Built once such a project wants in.
-4. **ProjectRegistry**: an ownerless project list decided by an IMD oracle panel, replacing `projects.json`, once more than one or two projects want in.
+2. **Deploy the Stacker on Ethereum mainnet** from this repository, with a full audit by the IMD swarm. PLEA mainnet needs its address. [`jobs/4-mainnet-launch.md`](jobs/4-mainnet-launch.md)
+3. **Indexer and mainnet dashboard:** the events kept in a fast table, then the site with each trader's cashback, points and value, and the leaderboards.
+4. **Multichain:** Robinhood Chain first (PondPad), then Base and Arbitrum. Cashback waits per trader on that chain and goes to Ethereum through IMD's own LayerZero bridge, paid by a small tip ([design](docs/design.md#multichain-cashback-from-other-chains)).
+5. **v2: the ETH route** for projects whose fees are in ETH. `creditETH(trader)` records pending ETH; a public `flush()` swaps the batch to IMD through POOL4 behind a TWAP price guard, deposits it and splits the shares. Built once such a project wants in.
+6. **ProjectRegistry**: an ownerless project list decided by an IMD oracle panel, replacing `projects.json`, once more than one or two projects want in.
 
 Open questions (with recommendations) are in the [design notes](docs/design.md#open-questions): an sIMD vault on Robinhood Chain, and cashback on sells as well as buys.
 
@@ -152,6 +168,12 @@ Open questions (with recommendations) are in the [design notes](docs/design.md#o
 
 ```
 README.md                 this page
+src/Stacker.sol           the Stacker (mainnet version)
+test/                     Foundry tests: unit, edge cases, fuzz, invariants, deployment, mainnet fork
+  mocks/                  TestIMD and TestSIMD (a copy of StakedIMD), test doubles only
+lib/                      forge-std, OpenZeppelin and Solady files, vendored
+launch.json               the IMD launch manifest: one Stacker, mainnet IMD and sIMD
+foundry.toml              solc 0.8.26, cancun, 10,000 optimizer runs, bytecode_hash none
 docs/
   design.md               design detail: building blocks, points, ProjectRegistry, v2 ETH route,
                           decisions, open questions, launch settings, btc/acc lessons
@@ -165,6 +187,19 @@ jobs/                     IMD swarm job prompts, in order
   requests/               exact request bodies for the ready jobs
 NEXT_SESSION.md           the brief for the next working session
 ```
+
+## Build and test
+
+With [Foundry](https://getfoundry.sh) 1.8.3, the version IMD's verifier runs:
+
+```
+forge build
+forge test                                                        # 42 tests; the 3 fork tests skip
+ETH_RPC_URL=https://ethereum-rpc.publicnode.com forge test --mc MainnetFork   # live IMD and sIMD
+forge fmt --check src test
+```
+
+The fork tests check the live vault's facts (asset, renounced owner, not paused), a credit to a new and a repeat trader, and the one-block hold followed by a redeem.
 
 **Working with IMD:** jobs are paid in IMD (0.5 IMD each) from the owner's wallet. Run the free `POST https://api.imd.fun/requests/check` before paying. Set hosting only with the job's `ipfs` field, never in the prompt text, or the agent tries to publish the site itself and blocks. Docs: https://imd.fun/docs.
 

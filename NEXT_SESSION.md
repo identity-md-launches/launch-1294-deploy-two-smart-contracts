@@ -1,6 +1,6 @@
 Repo: **`khaed1/imd-acc`** (this repository: README, design notes, history, job prompts). If it isn't in your session, attach it with `add_repo` (push access). The imd/acc code IMD built and deployed is public at https://github.com/identity-md-launches/launch-1129-build-imd-acc-sepolia-test (commit `934fb404`, site PR #2 at `7de7d635`). imd/acc no longer lives in the shared notes repo `khaed1/claude` (branch `claude/adoring-goodall-pn3jyz`); its `HANDOFF.md` is mostly PLEA now, so read it only for PLEA details.
 
-You're working on **imd/acc**, a project I'm building on the IMD swarm (imd.fun). A separate session on my other account keeps working on **PLEA**, imd/acc's first integration, so don't change PLEA; just use it as the live example. Read `README.md` first, then `docs/design.md` and `docs/history.md`.
+You're working on **imd/acc**, a project I'm building on the IMD swarm (imd.fun). A separate session on my other account keeps working on **PLEA**, imd/acc's first integration, so don't change PLEA; just use it as the live example. Read `README.md` first, then `docs/design.md` and `docs/history.md`. Contracts: `src/Stacker.sol` (mainnet version) with Foundry tests in `test/`.
 
 ## imd/acc in brief
 Trading cashback paid in **staked IMD (sIMD)**, inspired by TokenWorks' btc/acc. A participating project sends 0.5% of each trade, taken from fees it already charges, to the trader as sIMD. It does this through one shared, ownerless **`Stacker.credit(trader, imdAmount)`**, which pulls the IMD from the project and calls `sIMD.deposit(amount, trader)`, so the vault mints shares straight to the trader. No new token and no cut. Every `Stacked(project, trader, imd, shares)` event is kept as **points** (trader and project), the basis for leaderboards and maybe a later airdrop (nothing promised). Only credits from **listed projects** earn points, from the block they were listed; anyone else's credits show as "direct, no points".
@@ -11,10 +11,10 @@ Trading cashback paid in **staked IMD (sIMD)**, inspired by TokenWorks' btc/acc.
 - **PLEA v10's hook** `0x3d4CcAc329010b8beA3b14498d9a45EAB00c68Cc` (block 11,885,872) credits 0.5% of every PLEA/IMD buy and sell inside the same swap. Stacker totals at block 11,889,292: 101.27 tIMD, 0.1674 from PLEA.
 - **Two jobs ready, waiting for my OK to pay** (both pass `POST /requests/check` with no blockers; exact bodies in `jobs/requests/`):
   1. `jobs/3-list-plea.md`: `job.continue` of `5530dde0` that lists PLEA in `projects.json` (tested locally against live Sepolia).
-  2. `jobs/4-mainnet-launch.md`: `launch.open` on chain 1 deploying only `Stacker(IMD, sIMD)` from the launch-1129 repo, with IMD's full audit plan. Tested on a mainnet fork: deploy 529k gas, first credit 197k–249k, repeat 112k.
+  2. `jobs/4-mainnet-launch.md`: `launch.open` on chain 1 deploying only the lean `Stacker(IMD, sIMD)` from **this repository** (`src/Stacker.sol`, `launch.json`), with IMD's full audit plan. 42 tests pass, plus 3 mainnet-fork tests (`ETH_RPC_URL=… forge test --mc MainnetFork`). Fork gas: deploy 446k, new trader 130k, repeat 96k.
 
 ## What's next (ask me before paying for any job)
-1. List PLEA. 2. Mainnet Stacker (PLEA mainnet needs its address). 3. v2 ETH route, when an ETH-fee project wants in. 4. ProjectRegistry, when more than one or two projects want listing. Open questions are in `docs/design.md`.
+1. List PLEA. 2. Mainnet Stacker (PLEA mainnet needs its address). 3. Indexer and mainnet dashboard. 4. Multichain route, Robinhood Chain first (`docs/design.md`, "Multichain"). 5. v2 ETH route, when an ETH-fee project wants in. 6. ProjectRegistry, when more than one or two projects want listing. Open questions are in `docs/design.md`.
 
 ## Useful facts
 - IMD docs https://imd.fun/docs/llms.txt · API https://api.imd.fun · free checks `POST /requests/import` and `POST /requests/check` · my orders `GET /requests/paid-by/0xf8ad3f88b0e0d177aa8c5e6be1e13410fd41cdc7` (jobs are paid from that wallet).

@@ -47,3 +47,12 @@ PLEA is a sell-gated meme token on Uniswap v4 (its own repository, `khaed1/plea`
 - **Mainnet:** [`jobs/4-mainnet-launch.md`](../jobs/4-mainnet-launch.md) is ready. IMD and sIMD were read on chain, and the exact Stacker was tested on a mainnet fork (see [design notes](design.md#ethereum-mainnet-ready-not-paid)). `/requests/check`: no blockers.
 - **Intake v2** (`0xa43e6f75ee006411f79ac1c84120606c2330de82`, the same address on Ethereum, Sepolia and Robinhood Chain) was announced by the IMD dev. imd/acc only needs it for the future ProjectRegistry.
 - **Moved** from `khaed1/claude` (`imd-acc/`) into this repository.
+
+## 5. Lean mainnet Stacker and the multichain design (2026-10-11)
+
+- **Decided in discussion:** the mainnet Stacker drops per-trader totals (points and the dashboard come from events); project points are the cashback a project paid, counted only for credits inside a swap on its pool; other chains use per-trader waiting balances delivered to Ethereum through IMD's own LayerZero bridge, paid by a tip of up to 2% rising over 12 hours. Details in [design notes](design.md#project-points-and-the-dashboard).
+- **Mainnet Stacker written here** (`src/Stacker.sol`), with the launch-1129 tests adapted: per-trader checks now rebuild the figures from the events, the way the dashboard will. 42 tests pass; the 3 mainnet-fork tests pass against live IMD and sIMD.
+- **Launch blocker avoided:** IMD rehearses constructors on an empty chain, where the mainnet IMD and sIMD have no code. The Sepolia constructor calls `sIMD.asset()` and would have reverted there. The mainnet constructor checks and approves only where the vault has code; `test/Deployment.t.sol` covers both cases.
+- **Gas on a mainnet fork** (whole transactions): deploy 446,090; first credit ever 181,625; new trader 130,313; repeat trader 96,113. The Sepolia version measured 197k and 112k for the same calls.
+- **IMD bridge facts** for the multichain route: OFT v2 linked to Arbitrum, Base and Robinhood Chain (eid 30416); compose supported, no message inspector; 6 shared decimals.
+- The mainnet job ([`jobs/4-mainnet-launch.md`](../jobs/4-mainnet-launch.md)) now imports this repository instead of the launch-1129 one.
