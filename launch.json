@@ -4,22 +4,22 @@
     {
       "contract": "Stacker",
       "constructorArgs": [
-        "0x2B69099E59b05901faA1DD164fabf098bf831E82",
-        "0xF9e2EEc3B610ec6781f7438aC5Fb4bc049d81Cc1"
+        "0x2b69099e59b05901faa1dd164fabf098bf831e82",
+        "0xf9e2eec3b610ec6781f7438ac5fb4bc049d81cc1"
       ]
     },
     {
       "contract": "ProjectRegistry",
       "constructorArgs": [
-        "0xa43E6F75EE006411f79aC1C84120606C2330De82",
-        "0x44a1cd38474fB1748400e7DEb5F8d786cCe3F89a",
+        "0xa43e6f75ee006411f79ac1c84120606c2330de82",
+        "0x44a1cd38474fb1748400e7deb5f8d786cce3f89a",
         "$contract:Stacker",
-        "0x5598aa9146215bc13Eb26f2C692AD1461fD32982",
+        "0x5598aa9146215bc13eb26f2c692ad1461fd32982",
         "1",
         "5000000000000000000",
         "3600"
       ]
     }
   ],
-  "notes": "imd/acc Sepolia test run 2: two contracts. 1) Stacker, the updated cashback funnel, wired to the live TestIMD (with a faucet) and TestSIMD (a StakedIMD copy whose owner can pause it) of launch #1129: credit(trader, imdAmount) pulls IMD from the calling project and calls TestSIMD.deposit(imdAmount, trader), then emits Stacked(project, trader, imd, shares); per-project totals on chain; no owner, admin, fee, pause or upgrade; it checks and approves the vault only where the vault has code, so the empty-chain rehearsal passes. 2) ProjectRegistry, the list of projects whose cashback earns points, decided by IdentityMD oracle panels through Intake v2 (0xa43e...de82, paid in the Sepolia test IMD 0x44a1...f89a): anyone applies or challenges, paying the 0.5 IMD oracle fee (plus a 5 test-IMD bond for a challenge, cooldown 3600 s); answers are accepted only from the Intake, for its own open request, signed by the oracle signer 0x5598...2982 for this contract, from a 15-seat panel with 11 agreeing; questions are filed under chain 1 because the oracle has no Sepolia RPC. No owner; its constructor makes no external call. Test doubles under test/mocks are not deployed."
+  "notes": "Sepolia only (chainId 11155111). Deploy Stacker, then ProjectRegistry referencing this launch's Stacker. Reuse the existing TestIMD, TestSIMD and IdentityMD Intake v2 at the supplied addresses. Stacker.credit(trader, amount) pulls TestIMD from the caller and deposits it into TestSIMD for the trader, emitting Stacked(project, trader, imd, shares); project totals and the grand total are stored on chain. Its first nonzero credit validates the vault asset and approves the vault. ProjectRegistry uses the separate oracle payment token 0x44a1cd38474fb1748400e7deb5f8d786cce3f89a and the supplied oracle signer 0x5598aa9146215bc13eb26f2c692ad1461fd32982. Anyone may apply for a listing at 25-100 basis points or challenge a listed project. Each request pays the current Intake.priceOf fee; challenges also post a 5000000000000000000-unit bond (5 oracle test IMD). The initial listing challenge cooldown is 3600 seconds. Oracle results are accepted only from Intake for an open request, with a valid signature for this consumer, at least 15 panel seats, quorum at least 11, and agreement meeting both quorum and 11. Unsigned failure callbacks only clear requests and return challenge bonds. Application yes lists; challenge no delists. Points are computed off chain from Stacked events and listing periods. questionChainId is 1 for oracle routing; deployment and the signed consumer domain remain Sepolia. Both application contracts have no owner or admin; constructors are nonpayable, make no external calls and need no initialization. Deploy only these two application contracts; existing dependencies and test mocks are not deployed."
 }
