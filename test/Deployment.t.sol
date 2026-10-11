@@ -7,23 +7,31 @@ import {TestIMD} from "./mocks/TestIMD.sol";
 import {TestSIMD} from "./mocks/TestSIMD.sol";
 import {Stacker, IStakedIMD} from "../src/Stacker.sol";
 
-/// @dev Rehearses the mainnet launch: the manifest deploys exactly one Stacker with the live IMD and
-/// sIMD addresses; the constructor passes on an empty chain (the launch's rehearsal, where neither
-/// address has code); and the runtime meets the launch's limits (EIP-170 size, no DELEGATECALL /
-/// CALLCODE / SELFDESTRUCT).
+/// @dev Rehearses a launch: the manifest deploys exactly one Stacker, wired to a known IMD and vault
+/// pair (Ethereum mainnet on `main`, the live Sepolia test pair on the `sepolia` branch); the
+/// constructor passes on an empty chain (the launch's rehearsal, where neither address has code);
+/// and the runtime meets the launch's limits (EIP-170 size, no DELEGATECALL / CALLCODE /
+/// SELFDESTRUCT).
 contract DeploymentTest is Test {
     address internal constant MAINNET_IMD = 0xD34a99Bc0f67aE1bbd63C660e6d0b0dd03E263B7;
     address internal constant MAINNET_SIMD = 0x9Efa934D9fAd4AE28c998a40195646b965a97247;
+    /// @dev Sepolia test run #1129: TestIMD (with a faucet) and TestSIMD (a StakedIMD copy whose
+    /// owner can pause it).
+    address internal constant SEPOLIA_TEST_IMD = 0x2B69099E59b05901faA1DD164fabf098bf831E82;
+    address internal constant SEPOLIA_TEST_SIMD = 0xF9e2EEc3B610ec6781f7438aC5Fb4bc049d81Cc1;
 
-    function test_launchManifest_onlyStackerWithMainnetAddresses() public view {
+    function test_launchManifest_onlyStackerWithAKnownPair() public view {
         string memory json = vm.readFile("./launch.json");
         assertEq(vm.parseJsonString(json, ".kind"), "evm_contracts");
         assertEq(vm.parseJsonString(json, ".contracts[0].contract"), "Stacker");
         assertFalse(vm.keyExistsJson(json, ".contracts[1]"), "only one contract is deployed");
         string[] memory args = vm.parseJsonStringArray(json, ".contracts[0].constructorArgs");
         assertEq(args.length, 2);
-        assertEq(vm.parseAddress(args[0]), MAINNET_IMD, "first argument is IMD");
-        assertEq(vm.parseAddress(args[1]), MAINNET_SIMD, "second argument is sIMD");
+        address imd = vm.parseAddress(args[0]);
+        address vault = vm.parseAddress(args[1]);
+        bool mainnet = imd == MAINNET_IMD && vault == MAINNET_SIMD;
+        bool sepoliaTest = imd == SEPOLIA_TEST_IMD && vault == SEPOLIA_TEST_SIMD;
+        assertTrue(mainnet || sepoliaTest, "IMD and vault are a known pair, in that order");
     }
 
     function test_emptyChainRehearsal_constructorPasses() public {

@@ -35,6 +35,7 @@ contract MainnetForkTest is Test {
         string memory rpc = vm.envOr("ETH_RPC_URL", string(""));
         if (bytes(rpc).length == 0) return;
         vm.createSelectFork(rpc);
+        if (block.chainid != 1) return; // another network's RPC: skip rather than fail
         forked = true;
         stacker = new Stacker(IERC20(IMD), IStakedIMD(SIMD));
         deal(IMD, project, 1_000e18);

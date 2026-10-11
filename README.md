@@ -169,7 +169,7 @@ Open questions (with recommendations) are in the [design notes](docs/design.md#o
 ```
 README.md                 this page
 src/Stacker.sol           the Stacker (mainnet version)
-test/                     Foundry tests: unit, edge cases, fuzz, invariants, deployment, mainnet fork
+test/                     Foundry tests: unit, edge cases, fuzz, invariants, deployment, mainnet and Sepolia forks
   mocks/                  TestIMD and TestSIMD (a copy of StakedIMD), test doubles only
 lib/                      forge-std, OpenZeppelin and Solady files, vendored
 launch.json               the IMD launch manifest: one Stacker, mainnet IMD and sIMD
@@ -194,12 +194,15 @@ With [Foundry](https://getfoundry.sh) 1.8.3, the version IMD's verifier runs:
 
 ```
 forge build
-forge test                                                        # 42 tests; the 3 fork tests skip
-ETH_RPC_URL=https://ethereum-rpc.publicnode.com forge test --mc MainnetFork   # live IMD and sIMD
+forge test                                                        # 42 tests; the 6 fork tests skip
+ETH_RPC_URL=https://ethereum-rpc.publicnode.com forge test --mc MainnetFork            # live IMD and sIMD
+SEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com forge test --mc SepoliaFork # live TestIMD and TestSIMD
 forge fmt --check src test
 ```
 
-The fork tests check the live vault's facts (asset, renounced owner, not paused), a credit to a new and a repeat trader, and the one-block hold followed by a redeem.
+The mainnet fork tests check the live vault's facts (asset, renounced owner, not paused), a credit to a new and a repeat trader, and the one-block hold followed by a redeem. The Sepolia ones check a credit, its event and totals, and that a paused vault makes `credit` revert without moving anything.
+
+**Branches:** `main` holds the mainnet manifest. The `sepolia` branch differs only in `launch.json`, which wires the same Stacker to the live Sepolia TestIMD and TestSIMD for test runs.
 
 **Working with IMD:** jobs are paid in IMD (0.5 IMD each) from the owner's wallet. Run the free `POST https://api.imd.fun/requests/check` before paying. Set hosting only with the job's `ipfs` field, never in the prompt text, or the agent tries to publish the site itself and blocks. Docs: https://imd.fun/docs.
 
