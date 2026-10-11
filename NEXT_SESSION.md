@@ -13,7 +13,7 @@ Trading cashback paid in **staked IMD (sIMD)**, inspired by TokenWorks' btc/acc.
   1. `jobs/3-list-plea.md`: `job.continue` of `5530dde0` that lists PLEA in `projects.json` (tested locally against live Sepolia).
   2. `jobs/4-mainnet-launch.md`: `launch.open` on chain 1 deploying only the lean `Stacker(IMD, sIMD)` from **this repository** (`src/Stacker.sol`, `launch.json`), with IMD's full audit plan. 42 tests pass, plus 3 mainnet-fork tests (`ETH_RPC_URL=… forge test --mc MainnetFork`). Fork gas: deploy 446k, new trader 130k, repeat 96k.
 
-- **Sepolia test run 2 ready** (`jobs/5-sepolia-v2-launch.md` + `jobs/5-sepolia-v2-site.md`, request `jobs/requests/5-sepolia-v2-workflow.json`): the new Stacker from the `sepolia` branch on the live TestIMD/TestSIMD, plus a new test page that reads `listings/sepolia.json` from this repo. After it's live, PLEA's next version credits through it; list its hook by committing to `listings/sepolia.json`.
+- **Sepolia test run 2 ready** (`jobs/5-sepolia-v2-launch.md` + `jobs/5-sepolia-v2-site.md`, request `jobs/requests/5-sepolia-v2-workflow.json`): the new Stacker and the **ProjectRegistry** (`src/ProjectRegistry.sol`, oracle-decided listing on Intake v2) from the `sepolia` branch, on the live TestIMD/TestSIMD, plus a new test page that reads the registry. After it's live, PLEA's next version credits through the Stacker and applies to the registry (first trial; steps in `docs/design.md`).
 
 - **Listing:** `docs/listing.md` (steps, checklist, fee guard, `toBlock` delisting) and the GitHub form `.github/ISSUE_TEMPLATE/listing-application.yml`. The ProjectRegistry (Intake v2, failure callback) is designed in `docs/design.md`; its first trial is on Sepolia with PLEA's next version.
 

@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {TestIMD} from "./mocks/TestIMD.sol";
 import {TestSIMD} from "./mocks/TestSIMD.sol";
 import {Stacker, IStakedIMD} from "../src/Stacker.sol";
+import {ProjectRegistry} from "../src/ProjectRegistry.sol";
 
 /// @dev Rehearses a launch: the manifest deploys exactly one Stacker, wired to a known IMD and vault
 /// pair (Ethereum mainnet on `main`, the live Sepolia test pair on the `sepolia` branch); the
@@ -19,12 +20,19 @@ contract DeploymentTest is Test {
     /// owner can pause it).
     address internal constant SEPOLIA_TEST_IMD = 0x2B69099E59b05901faA1DD164fabf098bf831E82;
     address internal constant SEPOLIA_TEST_SIMD = 0xF9e2EEc3B610ec6781f7438aC5Fb4bc049d81Cc1;
+    /// @dev IdentityMD: the Intake v2 (same address on every chain), Sepolia's test IMD it is paid
+    /// in, and the oracle signer.
+    address internal constant INTAKE_V2 = 0xa43e6F75ee006411F79Ac1C84120606C2330DE82;
+    address internal constant SEPOLIA_ORACLE_IMD = 0x44a1Cd38474FB1748400E7DEb5F8D786ccE3F89A;
+    address internal constant ORACLE_SIGNER = 0x5598Aa9146215Bc13eb26f2c692Ad1461Fd32982;
 
-    function test_launchManifest_onlyStackerWithAKnownPair() public view {
+    /// @dev main: the Stacker alone, on mainnet. sepolia: the Stacker on the test pair, then the
+    /// ProjectRegistry wired to it, Intake v2, the test IMD and the oracle signer.
+    function test_launchManifest_knownShape() public view {
         string memory json = vm.readFile("./launch.json");
         assertEq(vm.parseJsonString(json, ".kind"), "evm_contracts");
         assertEq(vm.parseJsonString(json, ".contracts[0].contract"), "Stacker");
-        assertFalse(vm.keyExistsJson(json, ".contracts[1]"), "only one contract is deployed");
+        assertFalse(vm.keyExistsJson(json, ".contracts[2]"), "at most two contracts");
         string[] memory args = vm.parseJsonStringArray(json, ".contracts[0].constructorArgs");
         assertEq(args.length, 2);
         address imd = vm.parseAddress(args[0]);
@@ -32,6 +40,30 @@ contract DeploymentTest is Test {
         bool mainnet = imd == MAINNET_IMD && vault == MAINNET_SIMD;
         bool sepoliaTest = imd == SEPOLIA_TEST_IMD && vault == SEPOLIA_TEST_SIMD;
         assertTrue(mainnet || sepoliaTest, "IMD and vault are a known pair, in that order");
+
+        if (!vm.keyExistsJson(json, ".contracts[1]")) return;
+        assertTrue(sepoliaTest, "the registry ships on Sepolia first");
+        assertEq(vm.parseJsonString(json, ".contracts[1].contract"), "ProjectRegistry");
+        string[] memory r = vm.parseJsonStringArray(json, ".contracts[1].constructorArgs");
+        assertEq(r.length, 7);
+        assertEq(vm.parseAddress(r[0]), INTAKE_V2, "intake");
+        assertEq(vm.parseAddress(r[1]), SEPOLIA_ORACLE_IMD, "oracle asset");
+        assertEq(r[2], "$contract:Stacker", "the Stacker of this launch");
+        assertEq(vm.parseAddress(r[3]), ORACLE_SIGNER, "oracle signer");
+        assertEq(vm.parseUint(r[4]), 1, "questions filed under chain 1");
+        assertGt(vm.parseUint(r[5]), 0, "a challenge bond");
+        assertGt(vm.parseUint(r[6]), 0, "a challenge cooldown");
+    }
+
+    function test_registry_emptyChainRehearsal_constructorPasses() public {
+        assertEq(INTAKE_V2.code.length, 0);
+        vm.prank(makeAddr("factory"));
+        ProjectRegistry reg = new ProjectRegistry(
+            INTAKE_V2, SEPOLIA_ORACLE_IMD, makeAddr("stacker"), ORACLE_SIGNER, 1, 5e18, 1 hours
+        );
+        assertEq(address(reg.intake()), INTAKE_V2);
+        assertEq(reg.oracleSigner(), ORACLE_SIGNER);
+        _checkRuntime(address(reg));
     }
 
     function test_emptyChainRehearsal_constructorPasses() public {
