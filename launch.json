@@ -7,7 +7,19 @@
         "0x2B69099E59b05901faA1DD164fabf098bf831E82",
         "0xF9e2EEc3B610ec6781f7438aC5Fb4bc049d81Cc1"
       ]
+    },
+    {
+      "contract": "ProjectRegistry",
+      "constructorArgs": [
+        "0xa43E6F75EE006411f79aC1C84120606C2330De82",
+        "0x44a1cd38474fB1748400e7DEb5F8d786cCe3F89a",
+        "$contract:Stacker",
+        "0x5598aa9146215bc13Eb26f2C692AD1461fD32982",
+        "1",
+        "5000000000000000000",
+        "3600"
+      ]
     }
   ],
-  "notes": "imd/acc Sepolia test run 2: one contract, the updated Stacker, wired to the live TestIMD (with a faucet) and TestSIMD (a StakedIMD copy whose owner can pause it) deployed by launch #1129. No owner, admin, fee, pause or upgrade. credit(trader, imdAmount) pulls IMD from the calling project and calls TestSIMD.deposit(imdAmount, trader), so the shares go straight to the trader, then emits Stacked(project, trader, imd, shares). Per-project totals on chain; per-trader figures come from the events. The constructor checks asset() and approves the vault once, only where the vault has code, so the empty-chain rehearsal passes. TestIMD and TestSIMD under test/mocks are test doubles and are not deployed."
+  "notes": "imd/acc Sepolia test run 2: two contracts. 1) Stacker, the updated cashback funnel, wired to the live TestIMD (with a faucet) and TestSIMD (a StakedIMD copy whose owner can pause it) of launch #1129: credit(trader, imdAmount) pulls IMD from the calling project and calls TestSIMD.deposit(imdAmount, trader), then emits Stacked(project, trader, imd, shares); per-project totals on chain; no owner, admin, fee, pause or upgrade; it checks and approves the vault only where the vault has code, so the empty-chain rehearsal passes. 2) ProjectRegistry, the list of projects whose cashback earns points, decided by IdentityMD oracle panels through Intake v2 (0xa43e...de82, paid in the Sepolia test IMD 0x44a1...f89a): anyone applies or challenges, paying the 0.5 IMD oracle fee (plus a 5 test-IMD bond for a challenge, cooldown 3600 s); answers are accepted only from the Intake, for its own open request, signed by the oracle signer 0x5598...2982 for this contract, from a 15-seat panel with 11 agreeing; questions are filed under chain 1 because the oracle has no Sepolia RPC. No owner; its constructor makes no external call. Test doubles under test/mocks are not deployed."
 }
