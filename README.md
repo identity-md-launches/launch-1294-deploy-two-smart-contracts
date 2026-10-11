@@ -1,6 +1,6 @@
 # imd/acc
 
-**Trading cashback in staked IMD.** Every trade in a participating project sends 0.5% of the trade back to the trader as sIMD, IMD's staking-vault share, deposited straight into the trader's wallet, where it keeps earning the vault's yield.
+**Trading cashback in staked IMD.** Every trade in a participating project sends part of the trade, between 0.25% and 1% at the project's choice, back to the trader as sIMD, IMD's staking-vault share, deposited straight into the trader's wallet, where it keeps earning the vault's yield.
 
 | | |
 |---|---|
@@ -26,14 +26,15 @@
 
 - **No new token.** The cashback is IMD, staked. There is nothing else to buy.
 - **No custody.** imd/acc never holds the cashback. The vault mints the shares directly to the trader.
-- **No extra fee.** Projects pay the 0.5% out of fees they already charge, so traders pay nothing on top and projects don't have to add a new fee.
+- **No extra fee.** Projects pay the cashback out of fees they already charge, so traders pay nothing on top and projects don't have to add a new fee.
+- **Each project picks its rate,** from 0.25% to 1% of each trade. Projects with thin fees can still join; others can offer more to attract traders. PLEA pays 0.5%.
 - **No owner.** The shared contract has no admin, no fee, no pause and no upgrade.
 
 ## How it works
 
 ```
  trader ── trades ──► project's pool and hook
-                          │  takes 0.5% of the trade in IMD, out of its own fee
+                          │  takes its rate (0.25%–1%) of the trade in IMD, out of its own fee
                           ▼
               Stacker.credit(trader, amount)
                           │  pulls the IMD from the project
@@ -44,7 +45,7 @@
 ```
 
 1. A trader trades in a participating pool, for example PLEA/IMD.
-2. The project's hook takes 0.5% of the trade on the IMD side, so IMD-paired pools need no extra swap.
+2. The project's hook takes its cashback rate (0.25%–1%) of the trade on the IMD side, so IMD-paired pools need no extra swap.
 3. The hook calls `Stacker.credit(trader, amount)`. The Stacker pulls the IMD and deposits it into the sIMD vault with the trader as the receiver.
 4. The trader's sIMD balance goes up. They can unstake any time, except in the block where new shares arrive (the vault's one-block hold).
 
@@ -94,8 +95,9 @@ Test page: https://imd-acc-sepolia-test-run.site.identitymd.eth.limo. It shows y
 
 Every `Stacked` event is kept as a record. Points are the basis for the leaderboards and maybe a later airdrop; **nothing is promised**.
 
-- **Trader points:** 1 point per IMD stacked for the trader.
+- **Trader points:** 1 point per IMD stacked for the trader. A project with a higher rate gives its traders more cashback, so more points.
 - **Project points:** the IMD its traders stacked.
+- **Rate and guard:** each listing states the project's rate (0.25%–1%). To list, the part of the project's fee that really leaves it (to liquidity providers, burns, prizes) must be at least as large as its cashback, so trading with yourself to farm points always costs more than it brings back. Credits that don't match the stated rate earn no points.
 - **Listed projects only.** Anyone can call `credit` with their own IMD; that's just staking for someone, so it earns no points. Only credits from a listed project count, from the block it was listed (`fromBlock`), never before.
 - **The list today** is `projects.json` on the first test page (`{address, name, fromBlock}`). The test run 2 page reads [`listings/sepolia.json`](listings/sepolia.json) from this repository instead, so listing a project there is a commit, not a paid job. Later, an ownerless `ProjectRegistry` decided by an IMD oracle panel replaces it ([design notes](docs/design.md#which-projects-earn-points)).
 - **How they're counted:** by adding up the `Stacked` events, which can't be changed or deleted. An indexer keeps the totals ready for the site; project totals are also on chain.
@@ -122,7 +124,7 @@ The all-traders dashboard and leaderboards (top traders, top projects, 7-day and
 IERC20(imd).approve(address(stacker), type(uint256).max);
 
 // On each trade, with the real trader taken from hookData:
-uint256 cashback = imdSideAmount * 50 / 10_000;              // 0.5%, out of your existing fee
+uint256 cashback = imdSideAmount * RATE_BPS / 10_000;        // your rate: 25-100 bps (0.25%-1%), out of your fee
 try stacker.credit(trader, cashback) {
     // the trader now holds the sIMD
 } catch {
@@ -131,7 +133,7 @@ try stacker.credit(trader, cashback) {
 ```
 
 Rules:
-1. **Fund it from your fee.** Take the 0.5% on the IMD side of the trade, out of the fee you already charge.
+1. **Fund it from your fee.** Pick a rate from 0.25% to 1% and take it on the IMD side of the trade, out of the fee you already charge. The part of your fee that leaves you (liquidity, burns, prizes) must be at least as large as the cashback, or the listing is refused.
 2. **Never let imd/acc break a trade.** Wrap `credit` in `try/catch` and pay plain IMD if it fails.
 3. **Pay the real trader.** Read it from the router's `hookData`, fall back to `sender`, never use `tx.origin`.
 4. **Check gas before the call.** Require enough gas for `credit` up front and revert if it's short. Otherwise a wallet's gas estimate picks the cheaper path without cashback, and traders get plain IMD. PLEA learned this on Sepolia.
@@ -150,7 +152,7 @@ Rules:
 
 | Project | Chain | Status |
 |---|---|---|
-| **PLEA**: a sell-gated meme token on Uniswap v4 | Ethereum (Sepolia first) | **Live on Sepolia.** Its v10 hook credits 0.5% of every PLEA/IMD trade inside the same swap, for buys and sells; new and repeat traders were stacked. PLEA mainnet will use the mainnet Stacker. |
+| **PLEA**: a sell-gated meme token on Uniswap v4 | Ethereum (Sepolia first) | **Live on Sepolia.** Its v10 hook credits 0.5% (its rate) of every PLEA/IMD trade inside the same swap, for buys and sells; new and repeat traders were stacked. PLEA mainnet will use the mainnet Stacker. |
 | **PondPad**: an IMD-paired launchpad | Robinhood Chain | Planned. The sIMD vault is on Ethereum only, so PondPad uses the [multichain route](docs/design.md#multichain-cashback-from-other-chains): cashback waits on Robinhood Chain and is delivered to Ethereum as sIMD through IMD's own bridge. |
 
 ## Roadmap

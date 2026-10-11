@@ -93,7 +93,7 @@ footer { color: var(--faint); font-size: 13px; display: grid; gap: 6px; }
   <div class="hero">
     <span class="label">Trading cashback for the IMD ecosystem</span>
     <h1>Every trade stacks staked IMD for you.</h1>
-    <p>Participating projects send 0.5% of every trade back to the trader as sIMD, deposited straight into IMD's staking vault in their name. No claim, no extra fee, and it keeps earning.</p>
+    <p>Participating projects send 0.25% to 1% of every trade, at each project's choice, back to the trader as sIMD, deposited straight into IMD's staking vault in their name. No claim, no extra fee, and it keeps earning.</p>
     <div class="calc" role="group" aria-label="Cashback calculator">
       <div>
         <label class="label" for="trade">Your trade, in IMD</label>
@@ -103,7 +103,7 @@ footer { color: var(--faint); font-size: 13px; display: grid; gap: 6px; }
       <div>
         <span class="label">Stacked to your wallet</span>
         <div class="out" id="out">5 IMD</div>
-        <small>as sIMD at 0.5%. Ten trades this size: <span class="mono" id="ten">50 IMD</span></small>
+        <small>as sIMD at a 0.5% rate, like PLEA's. Ten trades this size: <span class="mono" id="ten">50 IMD</span></small>
       </div>
     </div>
   </div>
@@ -112,7 +112,7 @@ footer { color: var(--faint); font-size: 13px; display: grid; gap: 6px; }
     <h2>How it works</h2>
     <ol class="steps">
       <li><div><b>You trade</b> in a participating pool, say PLEA/IMD, through the project's site or any router that reaches the pool.</div></li>
-      <li><div><b>The hook takes 0.5% on the IMD side</b> of your trade. On IMD-paired pools there's nothing to swap, so it costs little gas and has no slippage.</div></li>
+      <li><div><b>The hook takes its rate (0.25%–1%) on the IMD side</b> of your trade. On IMD-paired pools there's nothing to swap, so it costs little gas and has no slippage.</div></li>
       <li><div><b>It deposits that IMD into the sIMD vault for you</b> with <code>deposit(amount, you)</code>. The vault mints the shares straight to your wallet.</div></li>
       <li><div><b>Your sIMD balance goes up.</b> Open the staking page or your wallet and it's there, growing with the vault's yield. Unstake whenever you like.</div></li>
     </ol>
@@ -133,7 +133,7 @@ footer { color: var(--faint); font-size: 13px; display: grid; gap: 6px; }
     <div class="facts">
       <div><strong>Nobody holds your cashback</strong><p>imd/acc never takes custody. Shares are minted directly to the trader's address.</p></div>
       <div><strong>The vault is renounced</strong><p>sIMD's <code>owner()</code> reads <code>0x0</code> and it isn't paused, checked on-chain on 9 Oct 2026. Nobody can pause it or sweep it.</p></div>
-      <div><strong>No fee on top</strong><p>Projects fund the 0.5% from fees they already charge. Traders pay nothing extra.</p></div>
+      <div><strong>No fee on top</strong><p>Projects fund the cashback from fees they already charge. Traders pay nothing extra.</p></div>
     </div>
   </section>
 
@@ -160,7 +160,7 @@ footer { color: var(--faint); font-size: 13px; display: grid; gap: 6px; }
         </div>
         <p>An IMD-paired token launchpad. imd/acc becomes its trading-rewards feature, paid out of fees it already collects in IMD.</p>
         <dl>
-          <dt>Cashback</dt><dd>0.5% of each trade</dd>
+          <dt>Cashback</dt><dd>0.25%–1% of each trade, its choice</dd>
           <dt>Funded by</dt><dd>Existing launchpad fees, not an extra charge</dd>
           <dt>Vault</dt><dd>sIMD lives on Ethereum. Needs an sIMD vault on Robinhood Chain, a bridge, or plain-IMD cashback there.</dd>
         </dl>
@@ -172,7 +172,7 @@ footer { color: var(--faint); font-size: 13px; display: grid; gap: 6px; }
     <h2>For projects</h2>
     <p>Any IMD-paired project can join with one call from its hook. Projects without a hook can use the drop-in imd/acc hook.</p>
     <pre>// in your hook's afterSwap, with the trader taken from hookData
-uint256 cashback = imdSideAmount * 50 / 10_000;   // 0.5%
+uint256 cashback = imdSideAmount * RATE_BPS / 10_000;   // 25-100 bps (0.25%-1%)
 try stacker.credit(trader, cashback) {             // → sIMD.deposit(cashback, trader)
 } catch {
     IMD.transfer(trader, cashback);                // plain IMD; the trade never reverts

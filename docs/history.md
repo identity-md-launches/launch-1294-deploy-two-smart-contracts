@@ -66,3 +66,9 @@ PLEA is a sell-gated meme token on Uniswap v4 (its own repository, `khaed1/plea`
   - `jobs/requests/5-sepolia-v2-workflow.json` (`workflow.open`): audit as it arrived, adapt, independent review, deploy, build and host a new test page (label `imd-acc-sepolia-v2`). It needed plain wording: "deploy one smart contract", what it does, and that publishing the site is approved and done by the platform, not the builders.
   - `jobs/requests/5-sepolia-v2-launch-only.json` (`launch.open`): the full audit panel, contracts only.
 - **The new page reads `listings/sepolia.json` from this repository**, so listing PLEA's next hook there is a commit, not a paid job. The old listing job (`jobs/3-list-plea.md`, for the first page and PLEA v10) is no longer needed.
+
+## 7. Cashback rate opened to 0.25%–1% (2026-10-11)
+
+- **Decided:** each project picks its cashback rate between 0.25% and 1% (was a fixed 0.5%; PLEA keeps 0.5%). Points stay 1 per IMD stacked, so a higher rate gives traders more points.
+- **Guard:** the part of a project's fee that really leaves it (liquidity, burns, prizes) must be at least its cashback, so self-trading for points always costs more than it returns. Listings state `rateBps`; the indexer flags credits that don't match it.
+- **No contract change:** the Stacker stakes whatever amount it's sent. The README, design notes, explainer, session brief and the texts of jobs 4 and 5 were updated, and the requests re-checked.

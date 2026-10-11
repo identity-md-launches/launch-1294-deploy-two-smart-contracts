@@ -3,7 +3,7 @@ Repo: **`khaed1/imd-acc`** (this repository: README, design notes, history, job 
 You're working on **imd/acc**, a project I'm building on the IMD swarm (imd.fun). A separate session on my other account keeps working on **PLEA**, imd/acc's first integration, so don't change PLEA; just use it as the live example. Read `README.md` first, then `docs/design.md` and `docs/history.md`. Contracts: `src/Stacker.sol` (mainnet version) with Foundry tests in `test/`.
 
 ## imd/acc in brief
-Trading cashback paid in **staked IMD (sIMD)**, inspired by TokenWorks' btc/acc. A participating project sends 0.5% of each trade, taken from fees it already charges, to the trader as sIMD. It does this through one shared, ownerless **`Stacker.credit(trader, imdAmount)`**, which pulls the IMD from the project and calls `sIMD.deposit(amount, trader)`, so the vault mints shares straight to the trader. No new token and no cut. Every `Stacked(project, trader, imd, shares)` event is kept as **points** (trader and project), the basis for leaderboards and maybe a later airdrop (nothing promised). Only credits from **listed projects** earn points, from the block they were listed; anyone else's credits show as "direct, no points".
+Trading cashback paid in **staked IMD (sIMD)**, inspired by TokenWorks' btc/acc. A participating project sends a share of each trade (0.25%–1%, its choice; PLEA uses 0.5%), taken from fees it already charges, to the trader as sIMD. It does this through one shared, ownerless **`Stacker.credit(trader, imdAmount)`**, which pulls the IMD from the project and calls `sIMD.deposit(amount, trader)`, so the vault mints shares straight to the trader. No new token and no cut. Every `Stacked(project, trader, imd, shares)` event is kept as **points** (trader and project), the basis for leaderboards and maybe a later airdrop (nothing promised). Only credits from **listed projects** earn points, from the block they were listed; anyone else's credits show as "direct, no points".
 
 ## Where it stands (2026-10-11)
 - **Live on Sepolia, launch #1129** (block 11,874,601): TestIMD `0x2b69099e59b05901faa1dd164fabf098bf831e82` (`faucet()`: 10,000 tIMD per address per 24h), TestSIMD `0xf9e2eec3b610ec6781f7438ac5fb4bc049d81cc1` (owner `0x4b91…6821` can pause it), **Stacker `0x293c7134ab8f6bf1d8ff44ed806575f8f1baf477`**.
@@ -27,7 +27,7 @@ Trading cashback paid in **staked IMD (sIMD)**, inspired by TokenWorks' btc/acc.
 
 ## Rules
 - **Explain simply.** When I need to choose, recommend one option.
-- **Don't change agreed numbers** (0.5% cashback, faucet amounts, points rules) without asking me.
+- **Don't change agreed numbers** (cashback 0.25%–1% chosen by each project, the fee guard, faucet amounts, points rules, the multichain tip up to 2% over 12h) without asking me.
 - **Keys:** never print or commit `TESTNET_KEY`; never ask me for a mainnet key.
 - **PLEA** (`khaed1/plea`, `khaed1/plea-site`) belongs to the other session: read only, don't push.
 - **PondPad** (branch `claude/bold-gauss-qhlw86` in `khaed1/claude`) is read-only. Never commit its code.
